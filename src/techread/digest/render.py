@@ -11,6 +11,21 @@ console = Console()
 
 
 def print_sources(rows: list[dict[str, Any]]) -> None:
+    """Print a formatted table of RSS sources with their configuration.
+
+    Args:
+        rows: List of dictionaries containing source information. Each dictionary should
+              contain at least the following keys:
+              - id: Unique identifier for the source
+              - enabled: 1 if enabled, 0 if disabled
+              - weight: Weighting factor for the source (float)
+              - name: Display name of the source
+              - url: URL of the RSS feed
+              - tags: Optional tags associated with the source (string)
+
+    Displays a Rich table showing each source's id, enabled status (✅/—),
+    weight, name, URL, and tags. Enabled sources are marked with a checkmark.
+    """
     t = Table(title="Sources")
     t.add_column("id", justify="right")
     t.add_column("enabled", justify="center")
@@ -31,6 +46,26 @@ def print_sources(rows: list[dict[str, Any]]) -> None:
 
 
 def print_ranked(posts: list[dict[str, Any]], *, show_breakdown: bool = True) -> None:
+    """Print a formatted table of ranked posts with scoring information.
+
+    Args:
+        posts: List of dictionaries containing post information. Each dictionary should
+               contain at least the following keys:
+               - id: Unique identifier for the post
+               - title: Title of the post
+               - word_count: Word count for reading time calculation
+               - score: Scoring value (float)
+               - read_state: Optional read state (e.g., "unread", "reading", "read")
+               - breakdown_json: Optional JSON string containing scoring breakdown
+                 with keys like 'freshness', 'topic_hits', and 'length_penalty'
+
+        show_breakdown: If True, includes a column showing the scoring breakdown.
+                        Defaults to True.
+
+    Displays a Rich table showing each post's rank, id, read state, score,
+    estimated reading time in minutes, title, and (optionally) the scoring
+    breakdown explaining why the post was scored that way.
+    """
     t = Table(title="Ranked posts")
     t.add_column("rank", justify="right")
     t.add_column("id", justify="right")
@@ -59,6 +94,26 @@ def print_ranked(posts: list[dict[str, Any]], *, show_breakdown: bool = True) ->
 
 
 def print_digest(posts: list[dict[str, Any]]) -> None:
+    """Print a compact digest of posts for quick browsing.
+
+    Args:
+        posts: List of dictionaries containing post information. Each dictionary should
+               contain at least the following keys:
+               - id: Unique identifier for the post
+               - title: Title of the post
+               - url: URL to the full article
+               - word_count: Word count for reading time calculation
+               - one_liner: Optional short summary/description
+
+    Displays a concise list of posts with:
+    - Rank number
+    - Estimated reading time in minutes
+    - Post title (bold)
+    - Optional one-liner summary
+    - Post id and URL
+
+    This format is optimized for quick scanning of multiple posts.
+    """
     console.print("[bold]Today's techread digest[/bold]")
     for i, p in enumerate(posts, start=1):
         wc = int(p.get("word_count") or 0)

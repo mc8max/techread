@@ -13,6 +13,35 @@ class FeedEntry:
 
 
 def parse_feed(url: str) -> list[FeedEntry]:
+    """Parse an RSS/Atom feed from the given URL and return a list of FeedEntry objects.
+
+    This function parses a feed using feedparser, extracts relevant fields from each entry,
+    and returns them as FeedEntry dataclass instances. The function handles various feed
+    formats and ensures consistent field extraction with fallback values.
+
+    Args:
+        url: The URL of the RSS or Atom feed to parse.
+
+    Returns:
+        A list of FeedEntry objects containing parsed feed entries. The list is
+        deduplicated by URL while preserving the original order of entries.
+
+    Raises:
+        Exception: If feedparser encounters an error parsing the URL (e.g., network
+                   issues, invalid URL, or unsupported feed format).
+
+    Notes:
+        - For each entry, the function extracts: title (with link as fallback),
+          url (link), author, and published date (with updated as fallback).
+        - All string fields are stripped of whitespace.
+        - Entries with empty URLs are filtered out during deduplication.
+        - The function preserves the order of entries as they appear in the feed.
+
+    Example:
+        >>> entries = parse_feed("https://example.com/rss.xml")
+        >>> for entry in entries:
+        ...     print(f"{entry.title} - {entry.url}")
+    """
     feed = feedparser.parse(url)
     entries: list[FeedEntry] = []
     for e in feed.entries or []:
