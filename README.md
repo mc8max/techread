@@ -1,0 +1,76 @@
+# techread
+
+A local CLI tool that fetches daily technical blogs/writings, ranks them for a busy reader, and (optionally) summarizes
+them using a local Ollama model.
+
+## Quickstart
+
+### 1) Install (recommended via pipx)
+```bash
+pipx install -e .
+```
+
+Or using a venv:
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+### 2) Add sources
+```bash
+techread sources add https://www.allthingsdistributed.com/atom.xml --name "All Things Distributed" --weight 1.3 --tags "distributed,sre"
+techread sources add https://netflixtechblog.com/feed --name "Netflix TechBlog" --weight 1.1 --tags "systems,platform"
+```
+
+### 3) Fetch and view a digest
+```bash
+techread fetch
+techread digest --today --top 10
+```
+
+### 4) Summarize a post (requires Ollama running locally)
+Start Ollama and pull a model, e.g.:
+```bash
+ollama pull llama3.1
+```
+
+Then:
+```bash
+techread summarize 42 --mode takeaways
+```
+
+## Config
+
+techread looks for a config file at:
+
+- macOS/Linux: `~/.config/techread/config.toml`
+- Windows: `%APPDATA%\techread\config.toml`
+
+Example `config.toml`:
+```toml
+db_path = "~/.local/share/techread/techread.db"
+cache_dir = "~/.local/share/techread/cache"
+ollama_host = "http://localhost:11434"
+ollama_model = "llama3.1"
+default_top_n = 10
+topics = ["distributed systems", "spark", "kafka", "data platform", "reliability", "llm"]
+```
+
+## Commands (high level)
+
+- `techread fetch`
+- `techread rank --today`
+- `techread digest --today`
+- `techread summarize <id>`
+- `techread open <id>`
+- `techread mark <id> --read|--saved|--skip|--unread`
+- `techread sources ...`
+
+## Notes
+
+- RSS/Atom is preferred. techread fetches linked articles, extracts readable text via `trafilatura`,
+  and stores it locally in SQLite.
+- Summaries are cached by content hash so repeated runs are fast.
+
+MIT License.
