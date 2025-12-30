@@ -1,6 +1,6 @@
 # Architecture
 
-**techread** is a local-first CLI tool that **fetches technical writing**, **ranks it for a busy reader**, and can **summarize content locally** using **Ollama**.  
+**techread** is a local-first CLI tool that **fetches technical writing**, **ranks it for a busy reader**, and can **summarize content locally** using **LM Studio**.  
 This document describes the architecture as implemented in the generated repository.
 
 ---
@@ -30,7 +30,7 @@ This document describes the architecture as implemented in the generated reposit
 3. **Extract**: Convert HTML to clean text (readability extraction).
 4. **Persist**: Store metadata + extracted text in SQLite.
 5. **Rank**: Compute a per-post score (explainable breakdown) and store it.
-6. **Summarize (optional)**: Call Ollama locally; cache summaries keyed by content hash.
+6. **Summarize (optional)**: Call LM Studio locally; cache summaries keyed by content hash.
 7. **Present**: Render ranked list/digest in terminal with Rich.
 
 ---
@@ -61,7 +61,7 @@ This document describes the architecture as implemented in the generated reposit
        │                    ▼                     │
        │             ┌───────────────┐            │
        │             │ Summarizer    │            │
-       │             │ (Ollama API)  │            │
+       │             │ (LM Studio)   │            │
        │             └───────────────┘            │
        ▼                                          ▼
 ┌───────────────┐                          ┌───────────────┐
@@ -86,7 +86,7 @@ src/techread/
   rank/
     scoring.py           # explainable scoring formula
   summarize/
-    ollama.py            # local Ollama client + prompts
+    llm.py               # local LM Studio client + prompts
   digest/
     render.py            # Rich output renderers
   utils/
@@ -106,7 +106,7 @@ src/techread/
 - **httpx**: HTTP client with redirects and timeout
 - **trafilatura**: content extraction to readable text
 - **python-dateutil**: robust RSS datetime parsing
-- **Ollama** (optional): local LLM inference via HTTP
+- **LM Studio** (optional): local LLM inference
 
 ---
 
@@ -121,8 +121,7 @@ src/techread/
 
 - `db_path`: SQLite database path
 - `cache_dir`: disk cache directory for fetched HTML
-- `ollama_host`: e.g. `http://localhost:11434`
-- `ollama_model`: e.g. `llama3.1`
+- `llm_model`: e.g. `mistral-small-3.2`
 - `default_top_n`: default digest size
 - `topics`: list of keywords used for simple relevance scoring
 
@@ -130,8 +129,7 @@ src/techread/
 
 - `TECHREAD_DB_PATH`
 - `TECHREAD_CACHE_DIR`
-- `TECHREAD_OLLAMA_HOST`
-- `TECHREAD_OLLAMA_MODEL`
+- `TECHREAD_LLM_MODEL`
 - `TECHREAD_DEFAULT_TOP_N`
 
 ---
@@ -181,7 +179,7 @@ techread stores all operational state locally in SQLite.
 **summaries**
 - `post_id` (FK)
 - `mode` (`short|bullets|takeaways`)
-- `model` (ollama model name)
+- `model` (LM Studio model name)
 - `content_hash` (ties summary to specific content version)
 - `summary_text`
 - `created_at`
@@ -235,13 +233,13 @@ For each enabled source:
 3. Optionally apply **time budget**:
    - Estimate minutes as `max(1, round(word_count / 220))`.
    - Choose items greedily by `score / minutes`.
-4. Optionally generate missing `short` summaries (Ollama) and cache them.
+4. Optionally generate missing `short` summaries (LM Studio) and cache them.
 5. Render digest view.
 
 ### `techread summarize`
 1. Load post by id.
 2. Check cached summary by `(mode, model, content_hash)`.
-3. If missing, call Ollama and store summary.
+3. If missing, call LM Studio and store summary.
 
 ### `techread mark`
 Update `posts.read_state`.
@@ -280,7 +278,7 @@ score = 1.00 * freshness
 
 ---
 
-## Summarization (Ollama)
+## Summarization (LM Studio)
 
 ### Modes
 
@@ -306,7 +304,7 @@ Article text is clipped to **12,000 characters** for summarization.
 - Each source fetch is isolated; failures don’t stop the whole run.
 - HTML caching reduces repeated network calls.
 - Missing extraction results are tolerated (post still stored).
-- Summarization failures produce a helpful message (commonly: Ollama not running).
+- Summarization failures produce a helpful message (commonly: LM Studio not running).
 
 ---
 
@@ -315,7 +313,7 @@ Article text is clipped to **12,000 characters** for summarization.
 - Local-first storage: content stays on your machine.
 - Outbound requests: RSS + HTTP fetch.
 - No inbound server is exposed.
-- Ollama inference is local unless you point `ollama_host` elsewhere.
+- LM Studio inference is local.
 
 ---
 

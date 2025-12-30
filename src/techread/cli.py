@@ -14,7 +14,7 @@ from .ingest.rss import parse_feed
 from .ingest.fetch import fetch_html
 from .ingest.extract import extract_text
 from .rank.scoring import score_post
-from .summarize.llm import LLMSettings, summarize as ollama_summarize, Mode
+from .summarize.llm import LLMSettings, summarize as llm_summarize, Mode
 from .digest.render import print_sources, print_ranked, print_digest
 
 app = typer.Typer(add_completion=False, help="techread: fetch, rank, and summarize technical blogs locally.")
@@ -169,7 +169,7 @@ def digest(
     today: bool = typer.Option(True, "--today/--all", help="Use recent posts (default)."),
     top: int | None = typer.Option(None, help="Top N items."),
     minutes: int = typer.Option(0, help="Time budget in minutes (0 = no budget)."),
-    auto_summarize: bool = typer.Option(True, help="Generate missing 1-line summaries for the digest (uses Ollama)."),
+    auto_summarize: bool = typer.Option(True, help="Generate missing 1-line summaries for the digest (uses LM Studio)."),
 ):
     """Print a busy-reader digest: ranked titles + optional 1-line takeaways."""
     settings = load_settings()
@@ -248,7 +248,7 @@ def digest(
 
         # 1-line summaries (mode=short)
         if auto_summarize:
-            oll = LLMSettings(model=settings.ollama_model, temperature=0.5)
+            llm_settings = LLMSettings(model=settings.llm_model, temperature=0.5)
             for it in items:
                 if not it.get("content_text"):
                     it["one_liner"] = ""
@@ -258,16 +258,16 @@ def digest(
                 existing = q1(
                     conn,
                     "SELECT summary_text FROM summaries WHERE post_id=? AND mode=? AND model=? AND content_hash=?",
-                    (int(it["id"]), "short", settings.ollama_model, ch),
+                    (int(it["id"]), "short", settings.llm_model, ch),
                 )
                 if existing:
                     one = str(existing["summary_text"]).strip()
                 else:
                     try:
-                        one = ollama_summarize(
-                            oll, mode="short", title=it["title"], url=it["url"], text=it["content_text"]
+                        one = llm_summarize(
+                            llm_settings, mode="short", title=it["title"], url=it["url"], text=it["content_text"]
                         )
-                        upsert_summary(conn, int(it["id"]), "short", settings.ollama_model, ch, one, now_utc_iso())
+                        upsert_summary(conn, int(it["id"]), "short", settings.llm_model, ch, one, now_utc_iso())
                     except Exception:
                         one = ""
                 it["one_liner"] = one.splitlines()[0].strip() if one else ""
@@ -283,7 +283,7 @@ def summarize(
     post_id: int = typer.Argument(..., help="Post id"),
     mode: Mode = typer.Option("takeaways", help="Summary mode: short|bullets|takeaways"),
 ):
-    """Summarize a stored post using Ollama. Cached by content hash."""
+    """Summarize a stored post using the configured LLM. Cached by content hash."""
     settings = load_settings()
     db = _db()
     with session(db) as conn:
@@ -298,7 +298,7 @@ def summarize(
             raise typer.Exit(code=1)
 
         ch = str(r["content_hash"] or "") or stable_hash(content)
-        model = settings.ollama_model
+        model = settings.llm_model
         existing = q1(
             conn,
             "SELECT summary_text FROM summaries WHERE post_id=? AND mode=? AND model=? AND content_hash=?",
@@ -308,11 +308,11 @@ def summarize(
             console.print(str(existing["summary_text"]))
             raise typer.Exit(code=0)
 
-        oll = LLMSettings(model=settings.ollama_model, temperature=0.5)
+        llm_settings = LLMSettings(model=settings.llm_model, temperature=0.5)
         try:
-            out = ollama_summarize(oll, mode=mode, title=str(r["title"]), url=str(r["url"]), text=content)
+            out = llm_summarize(llm_settings, mode=mode, title=str(r["title"]), url=str(r["url"]), text=content)
         except Exception as e:
-            console.print(f"[red]Summarization failed[/red]. Is Ollama running at {settings.ollama_host}? ({e})")
+            console.print(f"[red]Summarization failed[/red]. Is LM Studio running? ({e})")
             raise typer.Exit(code=1)
 
         upsert_summary(conn, int(post_id), mode, model, ch, out, now_utc_iso())

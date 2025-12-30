@@ -1,7 +1,7 @@
 # techread
 
 A local CLI tool that fetches daily technical blogs/writings, ranks them for a busy reader, and (optionally) summarizes
-them using a local Ollama model.
+them using a local LM Studio model.
 
 ## Quickstart
 
@@ -29,13 +29,8 @@ techread fetch
 techread digest --today --top 10
 ```
 
-### 4) Summarize a post (requires Ollama running locally)
-Start Ollama and pull a model, e.g.:
-```bash
-ollama pull llama3.1
-```
-
-Then:
+### 4) Summarize a post (requires LM Studio running locally)
+Start LM Studio and make sure a supported model is available, then:
 ```bash
 techread summarize 42 --mode takeaways
 ```
@@ -51,8 +46,7 @@ Example `config.toml`:
 ```toml
 db_path = "~/.local/share/techread/techread.db"
 cache_dir = "~/.local/share/techread/cache"
-ollama_host = "http://localhost:11434"
-ollama_model = "llama3.1"
+llm_model = "mistral-small-3.2"
 default_top_n = 10
 topics = ["distributed systems", "spark", "kafka", "data platform", "reliability", "llm"]
 ```

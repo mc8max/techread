@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Literal
 from langchain_openai import ChatOpenAI
 
@@ -21,16 +22,13 @@ LM_STUDIO_MODELS = {
     "qwen3-vl:30b": "qwen/qwen3-vl-30b",
 }
 
+DEFAULT_LMSTUDIO_API_KEY = "lmstudio-not-needed"
+DEFAULT_LMSTUDIO_BASE_URL = "http://localhost:1234/v1"
+
 @dataclass(frozen=True)
 class LLMSettings:
     model: str
     temperature: float
-
-@dataclass(frozen=True)
-class OllamaSettings:
-    host: str
-    model: str
-
 
 def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
     if mode == "short":
@@ -66,7 +64,9 @@ def get_lmstudio_llm(settings: LLMSettings) -> ChatOpenAI:
     actual_model = LM_STUDIO_MODELS.get(settings.model)
     if actual_model is None:
         raise ValueError(f"{settings.model} is not found in current LM Studio tool.")
-    return ChatOpenAI(model=actual_model, temperature=settings.temperature)
+    api_key = os.environ.get("OPENAI_API_KEY", DEFAULT_LMSTUDIO_API_KEY)
+    base_url = os.environ.get("OPENAI_BASE_URL", DEFAULT_LMSTUDIO_BASE_URL)
+    return ChatOpenAI(model=actual_model, temperature=settings.temperature, api_key=api_key, base_url=base_url)
 
 
 def summarize(settings: LLMSettings, *, mode: Mode, title: str, url: str, text: str) -> str:
