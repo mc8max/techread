@@ -89,7 +89,9 @@ def print_ranked(posts: list[dict[str, Any]], *, show_breakdown: bool = True) ->
             except Exception:
                 why = ""
 
-        t.add_row(str(i), str(p["id"]), state[:1].upper(), f"{score:.3f}", str(mins), str(p["title"]), why)
+        t.add_row(
+            str(i), str(p["id"]), state[:1].upper(), f"{score:.3f}", str(mins), str(p["title"]), why
+        )
     console.print(t)
 
 

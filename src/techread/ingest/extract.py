@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 import trafilatura
 
 from ..utils.text import normalize_whitespace
+
 
 @dataclass(frozen=True)
 class Extracted:
@@ -16,8 +18,10 @@ class Extracted:
         text: The extracted and normalized plain text content.
         word_count: The number of words in the extracted text.
     """
+
     text: str
     word_count: int
+
 
 def extract_text(html: str) -> Extracted:
     """Extract and clean plain text from HTML content.

@@ -1,23 +1,27 @@
 from __future__ import annotations
 
 import webbrowser
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Annotated
 
 import typer
 from rich.console import Console
 
 from .config import load_settings
-from .db import DB, init_db, session, q1, qall, exec_, upsert_score, upsert_summary
-from .utils.time import now_utc_iso, parse_datetime_iso, iso_from_dt
-from .utils.text import stable_hash
-from .ingest.rss import parse_feed
-from .ingest.fetch import fetch_html
+from .db import DB, exec_, init_db, q1, qall, session, upsert_score, upsert_summary
+from .digest.render import print_digest, print_ranked, print_sources
 from .ingest.extract import extract_text
+from .ingest.fetch import fetch_html
+from .ingest.rss import parse_feed
 from .rank.scoring import score_post
-from .summarize.llm import LLMSettings, summarize as llm_summarize, Mode
-from .digest.render import print_sources, print_ranked, print_digest
+from .summarize.llm import LLMSettings, Mode
+from .summarize.llm import summarize as llm_summarize
+from .utils.text import stable_hash
+from .utils.time import iso_from_dt, now_utc_iso, parse_datetime_iso
 
-app = typer.Typer(add_completion=False, help="techread: fetch, rank, and summarize technical blogs locally.")
+app = typer.Typer(
+    add_completion=False, help="techread: fetch, rank, and summarize technical blogs locally."
+)
 sources_app = typer.Typer(help="Manage sources (RSS/Atom).")
 app.add_typer(sources_app, name="sources")
 
@@ -46,7 +50,9 @@ def _parse_or_fallback(published: str) -> str:
 
 
 @app.command()
-def fetch(limit_per_source: int = typer.Option(50, help="Max entries to consider per source per run.")):
+def fetch(
+    limit_per_source: int = typer.Option(50, help="Max entries to consider per source per run.")
+):
     """Fetch new posts from enabled sources, extract readable text, and store locally."""
     settings = load_settings()
     db = _db()
@@ -94,7 +100,17 @@ def fetch(limit_per_source: int = typer.Option(50, help="Max entries to consider
                     conn,
                     "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread')",
-                    (int(s["id"]), e.title or e.url, e.url, author, published_iso, fetched_at, content_text, content_hash, int(word_count)),
+                    (
+                        int(s["id"]),
+                        e.title or e.url,
+                        e.url,
+                        author,
+                        published_iso,
+                        fetched_at,
+                        content_text,
+                        content_hash,
+                        int(word_count),
+                    ),
                 )
                 new_posts += 1
 
@@ -169,7 +185,9 @@ def digest(
     today: bool = typer.Option(True, "--today/--all", help="Use recent posts (default)."),
     top: int | None = typer.Option(None, help="Top N items."),
     minutes: int = typer.Option(0, help="Time budget in minutes (0 = no budget)."),
-    auto_summarize: bool = typer.Option(True, help="Generate missing 1-line summaries for the digest (uses LM Studio)."),
+    auto_summarize: bool = typer.Option(
+        True, help="Generate missing 1-line summaries for the digest (uses LM Studio)."
+    ),
 ):
     """Print a busy-reader digest: ranked titles + optional 1-line takeaways."""
     settings = load_settings()
@@ -265,9 +283,15 @@ def digest(
                 else:
                     try:
                         one = llm_summarize(
-                            llm_settings, mode="short", title=it["title"], url=it["url"], text=it["content_text"]
+                            llm_settings,
+                            mode="short",
+                            title=it["title"],
+                            url=it["url"],
+                            text=it["content_text"],
                         )
-                        upsert_summary(conn, int(it["id"]), "short", settings.llm_model, ch, one, now_utc_iso())
+                        upsert_summary(
+                            conn, int(it["id"]), "short", settings.llm_model, ch, one, now_utc_iso()
+                        )
                     except Exception:
                         one = ""
                 it["one_liner"] = one.splitlines()[0].strip() if one else ""
@@ -281,7 +305,7 @@ def digest(
 @app.command()
 def summarize(
     post_id: int = typer.Argument(..., help="Post id"),
-    mode: Mode = typer.Option("takeaways", help="Summary mode: short|bullets|takeaways"),
+    mode: Annotated[Mode, typer.Option(help="Summary mode: short|bullets|takeaways")] = "takeaways",
 ):
     """Summarize a stored post using the configured LLM. Cached by content hash."""
     settings = load_settings()
@@ -294,7 +318,9 @@ def summarize(
 
         content = str(r["content_text"] or "")
         if len(content) < 200:
-            console.print("[yellow]Not enough extracted text to summarize.[/yellow] Try `techread open <id>`.")
+            console.print(
+                "[yellow]Not enough extracted text to summarize.[/yellow] Try `techread open <id>`."
+            )
             raise typer.Exit(code=1)
 
         ch = str(r["content_hash"] or "") or stable_hash(content)
@@ -310,10 +336,12 @@ def summarize(
 
         llm_settings = LLMSettings(model=settings.llm_model, temperature=0.5)
         try:
-            out = llm_summarize(llm_settings, mode=mode, title=str(r["title"]), url=str(r["url"]), text=content)
+            out = llm_summarize(
+                llm_settings, mode=mode, title=str(r["title"]), url=str(r["url"]), text=content
+            )
         except Exception as e:
             console.print(f"[red]Summarization failed[/red]. Is LM Studio running? ({e})")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
 
         upsert_summary(conn, int(post_id), mode, model, ch, out, now_utc_iso())
         console.print(out)
@@ -343,7 +371,9 @@ def mark(
     choices = [("read", read), ("saved", saved), ("skip", skip), ("unread", unread)]
     selected = [name for name, enabled in choices if enabled]
     if len(selected) != 1:
-        console.print("[red]Invalid state[/red]: choose exactly one of --read/--saved/--skip/--unread.")
+        console.print(
+            "[red]Invalid state[/red]: choose exactly one of --read/--saved/--skip/--unread."
+        )
         raise typer.Exit(code=1)
     state = selected[0]
 
@@ -384,7 +414,7 @@ def sources_add(
             )
         except Exception as e:
             console.print(f"[red]Could not add source[/red]: {e}")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
     console.print(f"Added source: [bold]{nm}[/bold]")
 
 
@@ -429,7 +459,7 @@ def sources_test(url: str = typer.Argument(..., help="RSS/Atom feed URL")):
         entries = parse_feed(url)[:5]
     except Exception as e:
         console.print(f"[red]Failed[/red]: {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
     if not entries:
         console.print("[yellow]No entries found.[/yellow]")

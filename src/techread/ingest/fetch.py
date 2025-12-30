@@ -9,6 +9,7 @@ from ..utils.text import stable_hash
 
 DEFAULT_TIMEOUT = 20.0
 
+
 def cache_path_for_url(cache_dir: str, url: str) -> Path:
     """Generate a cache file path for a given URL.
 
@@ -29,6 +30,7 @@ def cache_path_for_url(cache_dir: str, url: str) -> Path:
     """
     h = stable_hash(url)
     return Path(cache_dir) / "html" / f"{h}.html"
+
 
 def fetch_html(url: str, cache_dir: str, user_agent: str = "techread/0.1") -> str:
     """Fetch HTML content from a URL with caching support.

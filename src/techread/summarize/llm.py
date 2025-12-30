@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from typing import Literal
+
 from langchain_openai import ChatOpenAI
 
 Mode = Literal["short", "bullets", "takeaways"]
@@ -25,16 +26,31 @@ LM_STUDIO_MODELS = {
 DEFAULT_LMSTUDIO_API_KEY = "lmstudio-not-needed"
 DEFAULT_LMSTUDIO_BASE_URL = "http://localhost:1234/v1"
 
+
 @dataclass(frozen=True)
 class LLMSettings:
     model: str
     temperature: float
 
+
 def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
+    """Generate a prompt for the LLM based on the summary mode.
+
+    Args:
+        mode: The summary mode ("short", "bullets", or "takeaways").
+        title: The title of the article to summarize.
+        url: The URL of the article.
+        text: The full text content of the article.
+
+    Returns:
+        A formatted prompt string containing instructions and the article text.
+    """
     if mode == "short":
         instruction = "Write a TL;DR in 2-3 sentences. Be concrete and technical. No fluff."
     elif mode == "bullets":
-        instruction = "Summarize into up to 5 bullet points. Each bullet must be one sentence. Be specific."
+        instruction = (
+            "Summarize into up to 5 bullet points. Each bullet must be one sentence. Be specific."
+        )
     else:
         instruction = (
             "Produce: (1) 3 key takeaways (bullets), (2) a 'Why it matters' paragraph (max 3 sentences), "
@@ -48,6 +64,7 @@ def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
         f"{instruction}\n\n"
         f"Article text:\n{clipped}\n"
     )
+
 
 def get_lmstudio_llm(settings: LLMSettings) -> ChatOpenAI:
     """Return a ChatOpenAI instance for LM Studio models.
@@ -66,10 +83,24 @@ def get_lmstudio_llm(settings: LLMSettings) -> ChatOpenAI:
         raise ValueError(f"{settings.model} is not found in current LM Studio tool.")
     api_key = os.environ.get("OPENAI_API_KEY", DEFAULT_LMSTUDIO_API_KEY)
     base_url = os.environ.get("OPENAI_BASE_URL", DEFAULT_LMSTUDIO_BASE_URL)
-    return ChatOpenAI(model=actual_model, temperature=settings.temperature, api_key=api_key, base_url=base_url)
+    return ChatOpenAI(
+        model=actual_model, temperature=settings.temperature, api_key=api_key, base_url=base_url
+    )
 
 
 def summarize(settings: LLMSettings, *, mode: Mode, title: str, url: str, text: str) -> str:
+    """Generate a summary of the given text using an LLM.
+
+    Args:
+        settings: The LLM configuration settings.
+        mode: The summary mode ("short", "bullets", or "takeaways").
+        title: The title of the article to summarize.
+        url: The URL of the article.
+        text: The full text content of the article.
+
+    Returns:
+        The generated summary as a string.
+    """
     llm = get_lmstudio_llm(settings)
     response = llm.invoke(_prompt(mode, title, url, text))
     return (response.content or "").strip()
