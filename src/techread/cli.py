@@ -334,13 +334,18 @@ def open(post_id: int = typer.Argument(..., help="Post id")):
 @app.command()
 def mark(
     post_id: int = typer.Argument(..., help="Post id"),
-    state: str = typer.Option(..., "--read/--saved/--skip/--unread", help="Set read state."),
+    read: bool = typer.Option(False, "--read", help="Mark as read."),
+    saved: bool = typer.Option(False, "--saved", help="Mark as saved."),
+    skip: bool = typer.Option(False, "--skip", help="Mark as skipped."),
+    unread: bool = typer.Option(False, "--unread", help="Mark as unread."),
 ):
     """Update read state for a post."""
-    allowed = {"read", "saved", "skip", "unread"}
-    if state not in allowed:
-        console.print(f"[red]Invalid state[/red]: {state} (allowed: {sorted(allowed)})")
+    choices = [("read", read), ("saved", saved), ("skip", skip), ("unread", unread)]
+    selected = [name for name, enabled in choices if enabled]
+    if len(selected) != 1:
+        console.print("[red]Invalid state[/red]: choose exactly one of --read/--saved/--skip/--unread.")
         raise typer.Exit(code=1)
+    state = selected[0]
 
     db = _db()
     with session(db) as conn:
