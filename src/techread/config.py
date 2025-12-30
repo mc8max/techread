@@ -128,12 +128,17 @@ def load_settings() -> Settings:
     topics = data.get("topics", []) or []
     topics = [str(t).strip() for t in topics if str(t).strip()]
 
-    # Environment overrides (useful for testing)
-    db_path = _expand(os.environ.get("TECHREAD_DB_PATH", db_path))
-    cache_dir = _expand(os.environ.get("TECHREAD_CACHE_DIR", cache_dir))
-    llm_model = os.environ.get(
-        "TECHREAD_LLM_MODEL", os.environ.get("TECHREAD_LLM_MODEL", llm_model)
-    )
+    # Environment overrides (useful for testing); ignore empty values.
+    env_db_path = os.environ.get("TECHREAD_DB_PATH")
+    env_cache_dir = os.environ.get("TECHREAD_CACHE_DIR")
+    env_llm_model = os.environ.get("TECHREAD_LLM_MODEL")
+
+    if env_db_path:
+        db_path = _expand(env_db_path)
+    if env_cache_dir:
+        cache_dir = _expand(env_cache_dir)
+    if env_llm_model:
+        llm_model = env_llm_model
     try:
         default_top_n = int(os.environ.get("TECHREAD_DEFAULT_TOP_N", str(default_top_n)))
     except ValueError:

@@ -263,3 +263,41 @@ class TestSummarize:
             result = summarize(settings, mode="short", title=title, url=url, text=text)
 
             assert result == "Summary with spaces"
+
+    def test_summarize_strips_thinking_block(self) -> None:
+        """Test summary generation strips model thinking blocks."""
+        settings = LLMSettings(model="mistral-small-3.2", temperature=0.7)
+        title = "Thinking Article"
+        url = "https://example.com/thinking"
+        text = "Some content."
+
+        mock_response = MagicMock()
+        mock_response.content = "<think>Reasoning here.</think>\nFinal answer."
+
+        with patch("techread.summarize.llm.get_lmstudio_llm") as mock_get_llm:
+            mock_llm = MagicMock()
+            mock_llm.invoke.return_value = mock_response
+            mock_get_llm.return_value = mock_llm
+
+            result = summarize(settings, mode="short", title=title, url=url, text=text)
+
+            assert result == "Final answer."
+
+    def test_summarize_strips_thinking_trailer(self) -> None:
+        """Test summary generation strips reasoning text before a closing tag."""
+        settings = LLMSettings(model="mistral-small-3.2", temperature=0.7)
+        title = "Thinking Trailer"
+        url = "https://example.com/thinking-trailer"
+        text = "Some content."
+
+        mock_response = MagicMock()
+        mock_response.content = "Reasoning...\n</think>\nFinal answer."
+
+        with patch("techread.summarize.llm.get_lmstudio_llm") as mock_get_llm:
+            mock_llm = MagicMock()
+            mock_llm.invoke.return_value = mock_response
+            mock_get_llm.return_value = mock_llm
+
+            result = summarize(settings, mode="short", title=title, url=url, text=text)
+
+            assert result == "Final answer."

@@ -136,7 +136,7 @@ class TestLoadSettings:
         assert isinstance(settings, Settings)
         assert settings.db_path.endswith("techread.db")
         assert settings.cache_dir.endswith("cache")
-        assert settings.llm_model == "mistral-small-3.2"
+        assert settings.llm_model == "nemotron-3-nano"
         assert settings.default_top_n == 10
         assert settings.topics == []
 

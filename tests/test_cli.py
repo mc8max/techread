@@ -118,25 +118,34 @@ def test_rank_no_posts(temp_db):
         assert "No posts to rank" in result.output
 
 
-def test_sources_remove_invalid():
+def test_sources_remove_invalid(temp_db):
     """Test sources remove with invalid ID."""
-    result = runner.invoke(app, ["sources", "remove", "999"])
-    assert result.exit_code == 1
-    assert "No such source" in result.output
+    with patch("techread.cli.load_settings") as mock_load:
+        mock_load.return_value.db_path = temp_db
+
+        result = runner.invoke(app, ["sources", "remove", "999"])
+        assert result.exit_code == 1
+        assert "No such source" in result.output
 
 
-def test_sources_enable_invalid():
+def test_sources_enable_invalid(temp_db):
     """Test sources enable with invalid ID."""
-    result = runner.invoke(app, ["sources", "enable", "999"])
-    assert result.exit_code == 1
-    assert "No such source" in result.output
+    with patch("techread.cli.load_settings") as mock_load:
+        mock_load.return_value.db_path = temp_db
+
+        result = runner.invoke(app, ["sources", "enable", "999"])
+        assert result.exit_code == 1
+        assert "No such source" in result.output
 
 
-def test_sources_disable_invalid():
+def test_sources_disable_invalid(temp_db):
     """Test sources disable with invalid ID."""
-    result = runner.invoke(app, ["sources", "disable", "999"])
-    assert result.exit_code == 1
-    assert "No such source" in result.output
+    with patch("techread.cli.load_settings") as mock_load:
+        mock_load.return_value.db_path = temp_db
+
+        result = runner.invoke(app, ["sources", "disable", "999"])
+        assert result.exit_code == 1
+        assert "No such source" in result.output
 
 
 def test_sources_test_invalid_url():
@@ -166,7 +175,13 @@ class TestCLIIntegration:
 class TestCLIOptions:
     """Test various CLI option combinations."""
 
-    def test_digest_options(self):
+    def test_digest_options(self, temp_db):
         """Test digest command with various options."""
-        result = runner.invoke(app, ["digest", "--today", "--top", "5"])
-        assert result.exit_code == 0
+        with patch("techread.cli.load_settings") as mock_load:
+            mock_load.return_value.db_path = temp_db
+            mock_load.return_value.default_top_n = 5
+            mock_load.return_value.llm_model = "nemotron-3-nano"
+            mock_load.return_value.topics = []
+
+            result = runner.invoke(app, ["digest", "--today", "--top", "5"])
+            assert result.exit_code == 0

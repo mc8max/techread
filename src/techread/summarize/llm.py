@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -60,11 +61,23 @@ def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
 
     clipped = text[:12000]
     return (
-        "You summarize technical writing for a busy senior engineer. Be precise.\n\n"
+        "You summarize technical writing for a busy senior engineer. Be precise.\n"
+        "Do not include chain-of-thought or hidden reasoning in the response.\n\n"
         f"Title: {title}\nURL: {url}\n\n"
         f"{instruction}\n\n"
         f"Article text:\n{clipped}\n"
     )
+
+
+_THINKING_BLOCK_RE = re.compile(r"<(think|analysis)>\s*.*?\s*</\1>\s*", re.DOTALL | re.IGNORECASE)
+_THINKING_TRAILER_RE = re.compile(r".*?</(think|analysis)>\s*", re.DOTALL | re.IGNORECASE)
+
+
+def _strip_thinking(text: str) -> str:
+    """Remove model reasoning blocks if present."""
+    without_blocks = _THINKING_BLOCK_RE.sub("", text)
+    without_trailer = _THINKING_TRAILER_RE.sub("", without_blocks, count=1)
+    return without_trailer.strip()
 
 
 def get_lmstudio_llm(settings: LLMSettings) -> ChatOpenAI:
@@ -104,4 +117,4 @@ def summarize(settings: LLMSettings, *, mode: Mode, title: str, url: str, text: 
     """
     llm = get_lmstudio_llm(settings)
     response = llm.invoke(_prompt(mode, title, url, text))
-    return (response.content or "").strip()
+    return _strip_thinking(response.content or "")
