@@ -6,6 +6,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+
 def _expand(p: str) -> str:
     """Expand environment variables and user paths in a string.
 
@@ -16,6 +17,7 @@ def _expand(p: str) -> str:
         Expanded path with environment variables and user paths resolved
     """
     return os.path.expanduser(os.path.expandvars(p))
+
 
 def _default_config_path() -> Path:
     """Get the default path for the configuration file.
@@ -35,6 +37,7 @@ def _default_config_path() -> Path:
         return Path(base) / "techread" / "config.toml"
     return Path.home() / ".config" / "techread" / "config.toml"
 
+
 def _default_db_path() -> str:
     """Get the default path for the SQLite database file.
 
@@ -50,6 +53,7 @@ def _default_db_path() -> str:
         base = os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))
         return str(Path(base) / "techread" / "techread.db")
     return str(Path.home() / ".local" / "share" / "techread" / "techread.db")
+
 
 def _default_cache_dir() -> str:
     """Get the default path for the cache directory.
@@ -67,6 +71,7 @@ def _default_cache_dir() -> str:
         return str(Path(base) / "techread" / "cache")
     return str(Path.home() / ".local" / "share" / "techread" / "cache")
 
+
 @dataclass(frozen=True)
 class Settings:
     """Configuration settings for the TechRead application.
@@ -81,11 +86,13 @@ class Settings:
         default_top_n: Default number of items to return in queries
         topics: List of topic keywords/phrases for filtering content
     """
+
     db_path: str
     cache_dir: str
     llm_model: str
     default_top_n: int
     topics: list[str]
+
 
 def load_settings() -> Settings:
     """Load application settings from configuration file and environment.
@@ -116,7 +123,7 @@ def load_settings() -> Settings:
 
     db_path = _expand(str(data.get("db_path", _default_db_path())))
     cache_dir = _expand(str(data.get("cache_dir", _default_cache_dir())))
-    llm_model = str(data.get("llm_model", data.get("llm_model", "mistral-small-3.2")))
+    llm_model = str(data.get("llm_model", data.get("llm_model", "nemotron-3-nano")))
     default_top_n = int(data.get("default_top_n", 10))
     topics = data.get("topics", []) or []
     topics = [str(t).strip() for t in topics if str(t).strip()]

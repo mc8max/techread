@@ -1,9 +1,10 @@
 """Unit tests for the scoring module."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+
 import pytest
 
-from techread.rank.scoring import score_post, ScoreResult, _freshness
+from techread.rank.scoring import ScoreResult, _freshness, score_post
 
 
 class TestFreshness:
@@ -12,7 +13,6 @@ class TestFreshness:
     def test_freshness_new_content(self):
         """Freshness should be 1.0 for brand new content."""
         assert _freshness(0.0) == pytest.approx(1.0, rel=1e-6)
-
 
     def test_freshness_very_old_content(self):
         """Freshness should approach 0 for very old content."""

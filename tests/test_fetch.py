@@ -8,6 +8,7 @@ import pytest
 
 from techread.ingest.fetch import cache_path_for_url, fetch_html
 
+
 class TestCachePathForUrl:
     """Test cases for cache_path_for_url function."""
 
@@ -74,10 +75,11 @@ class TestCachePathForUrl:
         assert isinstance(result, Path)
         assert str(result).endswith(".html")
 
+
 class TestFetchHtml:
     """Test cases for fetch_html function."""
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_fetch_from_cache(self, mock_client_class) -> None:
         """Test that cached content is returned without fetching."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -89,13 +91,13 @@ class TestFetchHtml:
             cache_path.write_text(cached_html)
 
             # Mock the stable_hash to return predictable value
-            with patch('techread.ingest.fetch.stable_hash', return_value="abc123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="abc123"):
                 result = fetch_html(url, cache_dir)
                 assert result == cached_html
                 # Verify no actual HTTP request was made
                 mock_client_class.assert_not_called()
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_fetch_new_content(self, mock_client_class) -> None:
         """Test fetching new content and caching it."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -111,7 +113,7 @@ class TestFetchHtml:
             mock_client_class.return_value.__enter__.return_value = mock_client
 
             # Mock stable_hash to return predictable value
-            with patch('techread.ingest.fetch.stable_hash', return_value="new123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="new123"):
                 result = fetch_html(url, cache_dir)
                 assert result == html_content
 
@@ -123,7 +125,7 @@ class TestFetchHtml:
                 assert cache_file.exists()
                 assert cache_file.read_text() == html_content
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_http_error_raised(self, mock_client_class) -> None:
         """Test that HTTP errors are properly raised."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -132,17 +134,16 @@ class TestFetchHtml:
             # Mock the HTTP client to raise an error
             mock_client = Mock()
             mock_response = Mock()
-            http_error = pytest.raises(Exception)
             mock_response.raise_for_status.side_effect = Exception("HTTP Error")
             mock_client.get.return_value = mock_response
             mock_client_class.return_value.__enter__.return_value = mock_client
 
             # Mock stable_hash
-            with patch('techread.ingest.fetch.stable_hash', return_value="error123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="error123"):
                 with pytest.raises(Exception, match="HTTP Error"):
                     fetch_html(url, cache_dir)
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_network_error_raised(self, mock_client_class) -> None:
         """Test that network errors are properly raised."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -154,11 +155,11 @@ class TestFetchHtml:
             mock_client_class.return_value.__enter__.return_value = mock_client
 
             # Mock stable_hash
-            with patch('techread.ingest.fetch.stable_hash', return_value="network123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="network123"):
                 with pytest.raises(Exception, match="Network Error"):
                     fetch_html(url, cache_dir)
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_cache_directory_created(self, mock_client_class) -> None:
         """Test that cache directory is created if it doesn't exist."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -175,14 +176,14 @@ class TestFetchHtml:
             mock_client_class.return_value.__enter__.return_value = mock_client
 
             # Mock stable_hash
-            with patch('techread.ingest.fetch.stable_hash', return_value="dirtest123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="dirtest123"):
                 result = fetch_html(url, str(cache_dir))
                 assert result == html_content
                 # Verify directory was created
                 assert cache_dir.exists()
                 assert (cache_dir / "html").exists()
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_user_agent_customization(self, mock_client_class) -> None:
         """Test that custom user agent is used."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -210,7 +211,7 @@ class TestFetchHtml:
             mock_client_class.side_effect = track_client
 
             # Mock stable_hash
-            with patch('techread.ingest.fetch.stable_hash', return_value="uatest123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="uatest123"):
                 result = fetch_html(url, cache_dir, user_agent=custom_ua)
                 assert result == html_content
 
@@ -219,7 +220,7 @@ class TestFetchHtml:
                 assert "headers" in client_init_calls[0]
                 assert client_init_calls[0]["headers"]["User-Agent"] == custom_ua
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_default_user_agent(self, mock_client_class) -> None:
         """Test that default user agent is used when not specified."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -246,7 +247,7 @@ class TestFetchHtml:
             mock_client_class.side_effect = track_client
 
             # Mock stable_hash
-            with patch('techread.ingest.fetch.stable_hash', return_value="defaultua123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="defaultua123"):
                 result = fetch_html(url, cache_dir)
                 assert result == html_content
 
@@ -255,7 +256,7 @@ class TestFetchHtml:
                 assert "headers" in client_init_calls[0]
                 assert client_init_calls[0]["headers"]["User-Agent"] == "techread/0.1"
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_html_with_encoding(self, mock_client_class) -> None:
         """Test handling of HTML with special characters and encoding."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -271,12 +272,12 @@ class TestFetchHtml:
             mock_client_class.return_value.__enter__.return_value = mock_client
 
             # Mock stable_hash
-            with patch('techread.ingest.fetch.stable_hash', return_value="encoding123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="encoding123"):
                 result = fetch_html(url, cache_dir)
                 assert "世界" in result
                 assert "🌍" in result
 
-    @patch('techread.ingest.fetch.httpx.Client')
+    @patch("techread.ingest.fetch.httpx.Client")
     def test_empty_html_content(self, mock_client_class) -> None:
         """Test handling of empty HTML content."""
         with tempfile.TemporaryDirectory() as cache_dir:
@@ -292,6 +293,6 @@ class TestFetchHtml:
             mock_client_class.return_value.__enter__.return_value = mock_client
 
             # Mock stable_hash
-            with patch('techread.ingest.fetch.stable_hash', return_value="empty123"):
+            with patch("techread.ingest.fetch.stable_hash", return_value="empty123"):
                 result = fetch_html(url, cache_dir)
                 assert result == ""

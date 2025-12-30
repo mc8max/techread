@@ -2,7 +2,7 @@
 
 import pytest
 
-from techread.ingest.extract import extract_text, Extracted
+from techread.ingest.extract import Extracted, extract_text
 
 
 class TestExtracted:

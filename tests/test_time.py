@@ -1,9 +1,9 @@
 """Unit tests for time utility functions."""
 
-import pytest
 from datetime import datetime, timezone
 
-from techread.utils.time import now_utc_iso, parse_datetime_iso, iso_from_dt
+from techread.utils.time import iso_from_dt, now_utc_iso, parse_datetime_iso
+
 
 class TestNowUtcIso:
     """Test cases for now_utc_iso function."""
@@ -30,6 +30,7 @@ class TestNowUtcIso:
         result1 = now_utc_iso()
         # Small delay to ensure different timestamp
         import time
+
         time.sleep(0.01)
         result2 = now_utc_iso()
         assert result1 != result2
@@ -39,6 +40,7 @@ class TestNowUtcIso:
         result = now_utc_iso()
         dt = datetime.fromisoformat(result)
         assert isinstance(dt, datetime)
+
 
 class TestParseDatetimeIso:
     """Test cases for parse_datetime_iso function."""
@@ -111,6 +113,7 @@ class TestParseDatetimeIso:
         result = parse_datetime_iso("2024-12-29T12:00:00")
         assert result.tzinfo == timezone.utc
 
+
 class TestIsoFromDt:
     """Test cases for iso_from_dt function."""
 
@@ -139,6 +142,7 @@ class TestIsoFromDt:
     def test_timezone_conversion(self) -> None:
         """Test that timezone conversion happens correctly."""
         from datetime import timedelta
+
         # Create a datetime in EST (UTC-5)
         est_tz = timezone(timedelta(hours=-5))
         dt_est = datetime(2024, 12, 29, 17, 0, 0, tzinfo=est_tz)

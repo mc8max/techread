@@ -86,6 +86,7 @@ class DB:
     Attributes:
         path: File system path to the SQLite database file.
     """
+
     path: str
 
 

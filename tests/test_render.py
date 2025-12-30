@@ -2,10 +2,7 @@
 
 import json
 
-import pytest
-from rich.console import Console
-
-from techread.digest.render import print_sources, print_ranked, print_digest
+from techread.digest.render import print_digest, print_ranked, print_sources
 
 
 class TestPrintSources:

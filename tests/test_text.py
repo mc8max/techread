@@ -1,8 +1,6 @@
 """Unit tests for text utility functions."""
 
-import pytest
-
-from techread.utils.text import stable_hash, normalize_whitespace, contains_any
+from techread.utils.text import contains_any, normalize_whitespace, stable_hash
 
 
 class TestStableHash:
@@ -170,7 +168,7 @@ class TestContainsAny:
 
     def test_unicode_text(self) -> None:
         """Test with unicode text."""
-        result = contains_any("こんにちは世界", ["はちにん"])
+        result = contains_any("こんにちは世界", ["こんにちは"])
         assert result == 1
 
     def test_substring_matching(self) -> None:

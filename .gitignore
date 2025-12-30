@@ -12,3 +12,6 @@ build/
 
 # Local
 local/
+
+# Coverage
+coverage.xml

@@ -10,6 +10,7 @@ Mode = Literal["short", "bullets", "takeaways"]
 
 
 LM_STUDIO_MODELS = {
+    "nemotron-3-nano": "nvidia/nemotron-3-nano",
     "mistral-small-3.2": "mistralai/mistral-small-3.2",
     "magistral-small-2509": "mistralai/magistral-small-2509",
     "gpt-oss:20b": "openai/gpt-oss-20b",
