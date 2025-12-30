@@ -14,7 +14,7 @@ from .ingest.rss import parse_feed
 from .ingest.fetch import fetch_html
 from .ingest.extract import extract_text
 from .rank.scoring import score_post
-from .summarize.ollama import OllamaSettings, summarize as ollama_summarize, Mode
+from .summarize.llm import LLMSettings, summarize as ollama_summarize, Mode
 from .digest.render import print_sources, print_ranked, print_digest
 
 app = typer.Typer(add_completion=False, help="techread: fetch, rank, and summarize technical blogs locally.")
@@ -248,7 +248,7 @@ def digest(
 
         # 1-line summaries (mode=short)
         if auto_summarize:
-            oll = OllamaSettings(host=settings.ollama_host, model=settings.ollama_model)
+            oll = LLMSettings(model=settings.ollama_model, temperature=0.5)
             for it in items:
                 if not it.get("content_text"):
                     it["one_liner"] = ""
@@ -308,7 +308,7 @@ def summarize(
             console.print(str(existing["summary_text"]))
             raise typer.Exit(code=0)
 
-        oll = OllamaSettings(host=settings.ollama_host, model=model)
+        oll = LLMSettings(model=settings.ollama_model, temperature=0.5)
         try:
             out = ollama_summarize(oll, mode=mode, title=str(r["title"]), url=str(r["url"]), text=content)
         except Exception as e:

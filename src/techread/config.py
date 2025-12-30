@@ -54,7 +54,7 @@ def load_settings() -> Settings:
     db_path = _expand(str(data.get("db_path", _default_db_path())))
     cache_dir = _expand(str(data.get("cache_dir", _default_cache_dir())))
     ollama_host = str(data.get("ollama_host", "http://localhost:11434")).rstrip("/")
-    ollama_model = str(data.get("ollama_model", "llama3.1"))
+    ollama_model = str(data.get("ollama_model", "mistral-small-3.2"))
     default_top_n = int(data.get("default_top_n", 10))
     topics = data.get("topics", []) or []
     topics = [str(t).strip() for t in topics if str(t).strip()]

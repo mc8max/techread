@@ -9,3 +9,6 @@ build/
 .coverage
 .cache/
 .DS_Store
+
+# Local
+local/
