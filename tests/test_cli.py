@@ -370,6 +370,7 @@ def test_digest_prints_metadata_without_summaries(temp_db):
         default_top_n=5,
         topics=[],
     )
+    published_at = now_utc_iso()
     with session(DB(path=temp_db)) as conn:
         conn.execute(
             "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
@@ -379,7 +380,7 @@ def test_digest_prints_metadata_without_summaries(temp_db):
                 "Digest Post",
                 "https://example.com/digest",
                 "Digest Author",
-                "2023-01-02T00:00:00+00:00",
+                published_at,
                 now_utc_iso(),
                 "content",
                 stable_hash("content"),
@@ -406,7 +407,203 @@ def test_digest_prints_metadata_without_summaries(temp_db):
     items = captured.get("items", [])
     assert len(items) == 1
     assert items[0]["author"] == "Digest Author"
-    assert items[0]["published_at"] == "2023-01-02T00:00:00+00:00"
+    assert items[0]["published_at"] == published_at
+
+
+def test_rank_filters_by_source_id(temp_db):
+    """Test rank filters posts by source id."""
+    settings = Settings(
+        db_path=temp_db,
+        cache_dir="/tmp/cache",
+        llm_model="test-model",
+        default_top_n=5,
+        topics=[],
+    )
+    with session(DB(path=temp_db)) as conn:
+        conn.execute(
+            "INSERT INTO sources(name, url, type, weight, tags, enabled, created_at) VALUES (?, ?, 'rss', 1.0, '', 1, ?)",
+            ("Other Source", "https://example.com/other.xml", now_utc_iso()),
+        )
+        conn.execute(
+            "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread')",
+            (
+                1,
+                "Source One Post",
+                "https://example.com/source1",
+                "Author",
+                now_utc_iso(),
+                now_utc_iso(),
+                "content",
+                stable_hash("content"),
+                100,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread')",
+            (
+                2,
+                "Source Two Post",
+                "https://example.com/source2",
+                "Author",
+                now_utc_iso(),
+                now_utc_iso(),
+                "content",
+                stable_hash("content2"),
+                100,
+            ),
+        )
+
+    captured = {}
+
+    def _capture(posts, **_kwargs):
+        captured["posts"] = posts
+
+    with patch("techread.cli.load_settings") as mock_load:
+        mock_load.return_value = settings
+        with patch("techread.cli.print_ranked") as mock_print:
+            mock_print.side_effect = _capture
+            result = runner.invoke(app, ["rank", "--top", "5", "--source", "2"])
+            assert result.exit_code == 0
+
+    posts = captured.get("posts", [])
+    assert len(posts) == 1
+    assert posts[0]["title"] == "Source Two Post"
+
+
+def test_rank_filters_by_tag(temp_db):
+    """Test rank filters posts by source name/tags."""
+    settings = Settings(
+        db_path=temp_db,
+        cache_dir="/tmp/cache",
+        llm_model="test-model",
+        default_top_n=5,
+        topics=[],
+    )
+    with session(DB(path=temp_db)) as conn:
+        conn.execute(
+            "INSERT INTO sources(name, url, type, weight, tags, enabled, created_at) VALUES (?, ?, 'rss', 1.0, ?, 1, ?)",
+            ("Data Source", "https://example.com/data.xml", "ml,infra", now_utc_iso()),
+        )
+        conn.execute(
+            "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread')",
+            (
+                1,
+                "Source One Post",
+                "https://example.com/source1",
+                "Author",
+                now_utc_iso(),
+                now_utc_iso(),
+                "content",
+                stable_hash("content"),
+                100,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread')",
+            (
+                2,
+                "Tagged Post",
+                "https://example.com/tagged",
+                "Author",
+                now_utc_iso(),
+                now_utc_iso(),
+                "content",
+                stable_hash("content2"),
+                100,
+            ),
+        )
+
+    captured = {}
+
+    def _capture(posts, **_kwargs):
+        captured["posts"] = posts
+
+    with patch("techread.cli.load_settings") as mock_load:
+        mock_load.return_value = settings
+        with patch("techread.cli.print_ranked") as mock_print:
+            mock_print.side_effect = _capture
+            result = runner.invoke(app, ["rank", "--top", "5", "--tag", "ML"])
+            assert result.exit_code == 0
+
+    posts = captured.get("posts", [])
+    assert len(posts) == 1
+    assert posts[0]["title"] == "Tagged Post"
+
+
+def test_digest_filters_by_source_id(temp_db):
+    """Test digest filters posts by source id."""
+    settings = Settings(
+        db_path=temp_db,
+        cache_dir="/tmp/cache",
+        llm_model="test-model",
+        default_top_n=5,
+        topics=[],
+    )
+    with session(DB(path=temp_db)) as conn:
+        conn.execute(
+            "INSERT INTO sources(name, url, type, weight, tags, enabled, created_at) VALUES (?, ?, 'rss', 1.0, '', 1, ?)",
+            ("Other Source", "https://example.com/other.xml", now_utc_iso()),
+        )
+        conn.execute(
+            "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread')",
+            (
+                1,
+                "Source One Digest",
+                "https://example.com/digest1",
+                "Author",
+                now_utc_iso(),
+                now_utc_iso(),
+                "content",
+                stable_hash("content"),
+                100,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO posts(source_id, title, url, author, published_at, fetched_at, content_text, content_hash, word_count, read_state) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread')",
+            (
+                2,
+                "Source Two Digest",
+                "https://example.com/digest2",
+                "Author",
+                now_utc_iso(),
+                now_utc_iso(),
+                "content",
+                stable_hash("content2"),
+                100,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO scores(post_id, scored_at, score, breakdown_json) VALUES (?, ?, ?, ?)",
+            (1, now_utc_iso(), 0.5, "{}"),
+        )
+        conn.execute(
+            "INSERT INTO scores(post_id, scored_at, score, breakdown_json) VALUES (?, ?, ?, ?)",
+            (2, now_utc_iso(), 0.6, "{}"),
+        )
+
+    captured = {}
+
+    def _capture(items):
+        captured["items"] = items
+
+    with patch("techread.cli.load_settings") as mock_load:
+        mock_load.return_value = settings
+        with patch("techread.cli.print_digest") as mock_print:
+            mock_print.side_effect = _capture
+            result = runner.invoke(
+                app, ["digest", "--top", "5", "--no-auto-summarize", "--source", "2"]
+            )
+            assert result.exit_code == 0
+
+    items = captured.get("items", [])
+    assert len(items) == 1
+    assert items[0]["title"] == "Source Two Digest"
 
 
 def test_mark_updates_state(temp_db):

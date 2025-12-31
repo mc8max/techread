@@ -28,6 +28,11 @@ app.add_typer(sources_app, name="sources")
 
 console = Console()
 
+SOURCE_OPTION = typer.Option(None, "-s", "--source", help="Filter by source id (repeatable).")
+TAG_OPTION = typer.Option(
+    None, "-t", "--tag", help="Filter by source name/tags containing tag (repeatable)."
+)
+
 
 def _db() -> DB:
     s = load_settings()
@@ -124,6 +129,8 @@ def rank(
     top: int | None = typer.Option(None, help="Show top N ranked posts."),
     include_read: bool = typer.Option(False, help="Include already read posts."),
     hours: int = typer.Option(48, help="Recent window for --today ranking."),
+    source: list[int] = SOURCE_OPTION,
+    tag: list[str] = TAG_OPTION,
 ):
     """Compute ranking scores for posts and print a ranked list with explanations."""
     settings = load_settings()
@@ -135,10 +142,23 @@ def rank(
         where = []
         params: list = []
         if today:
-            where.append("published_at >= ?")
+            where.append("p.published_at >= ?")
             params.append(iso_from_dt(since))
         if not include_read:
-            where.append("read_state != 'read'")
+            where.append("p.read_state != 'read'")
+        source_ids = [int(s) for s in (source or [])]
+        if source_ids:
+            placeholders = ",".join("?" for _ in source_ids)
+            where.append(f"s.id IN ({placeholders})")
+            params.extend(source_ids)
+        tag_terms = [str(t).strip().lower() for t in (tag or []) if str(t).strip()]
+        if tag_terms:
+            clauses = []
+            for t in tag_terms:
+                clauses.append("(lower(s.name) LIKE ? OR lower(s.tags) LIKE ?)")
+                like = f"%{t}%"
+                params.extend([like, like])
+            where.append("(" + " OR ".join(clauses) + ")")
         where_sql = " AND ".join(where)
         if where_sql:
             where_sql = "WHERE " + where_sql
@@ -173,9 +193,11 @@ def rank(
             conn,
             "SELECT p.id, p.title, p.url, p.word_count, p.read_state, sc.score, sc.breakdown_json "
             "FROM posts p JOIN scores sc ON p.id=sc.post_id "
+            "JOIN sources s ON p.source_id=s.id "
+            f"{where_sql} "
             "ORDER BY sc.score DESC "
             "LIMIT ?",
-            (top,),
+            (*params, top),
         )
         posts = [dict(x) for x in ranked]
         print_ranked(posts, show_breakdown=True)
@@ -189,6 +211,8 @@ def digest(
     auto_summarize: bool = typer.Option(
         True, help="Generate missing 1-line summaries for the digest (uses LM Studio)."
     ),
+    source: list[int] = SOURCE_OPTION,
+    tag: list[str] = TAG_OPTION,
 ):
     """Print a busy-reader digest: ranked titles + optional 1-line takeaways."""
     settings = load_settings()
@@ -202,9 +226,22 @@ def digest(
         where = []
         params: list = []
         if today:
-            where.append("published_at >= ?")
+            where.append("p.published_at >= ?")
             params.append(iso_from_dt(since))
-        where.append("read_state != 'read'")
+        where.append("p.read_state != 'read'")
+        source_ids = [int(s) for s in (source or [])]
+        if source_ids:
+            placeholders = ",".join("?" for _ in source_ids)
+            where.append(f"s.id IN ({placeholders})")
+            params.extend(source_ids)
+        tag_terms = [str(t).strip().lower() for t in (tag or []) if str(t).strip()]
+        if tag_terms:
+            clauses = []
+            for t in tag_terms:
+                clauses.append("(lower(s.name) LIKE ? OR lower(s.tags) LIKE ?)")
+                like = f"%{t}%"
+                params.extend([like, like])
+            where.append("(" + " OR ".join(clauses) + ")")
         where_sql = " AND ".join(where)
         if where_sql:
             where_sql = "WHERE " + where_sql
@@ -238,10 +275,11 @@ def digest(
             "SELECT p.id, p.title, p.url, p.author, p.published_at, p.word_count, "
             "p.read_state, p.content_text, p.content_hash, sc.score "
             "FROM posts p JOIN scores sc ON p.id=sc.post_id "
-            "WHERE p.read_state != 'read' "
+            "JOIN sources s ON p.source_id=s.id "
+            f"{where_sql} "
             "ORDER BY sc.score DESC "
             "LIMIT ?",
-            (top * 3,),
+            (*params, top * 3),
         )
         items = [dict(x) for x in ranked]
 
