@@ -231,12 +231,14 @@ For each enabled source:
 
 ### `techread rank`
 1. Select posts in the time window (default: last 48 hours) and not read (unless `--include-read`).
+2. Optional filtering by source ids (`-s/--source`) and source name/tags (`-t/--tag`).
 2. Compute `score` + `breakdown_json` for each post.
 3. Upsert into `scores`.
 4. Print top N by score.
 
 ### `techread digest`
 1. Ensure posts in window have scores (score if missing).
+2. Optional filtering by source ids (`-s/--source`) and source name/tags (`-t/--tag`).
 2. Pull a ranked candidate set (`top * 3`).
 3. Optionally apply **time budget**:
    - Estimate minutes as `max(1, round(word_count / 220))`.
