@@ -15,7 +15,7 @@ from .ingest.fetch import fetch_html
 from .ingest.rss import parse_feed
 from .rank.scoring import score_post
 from .sources.auto import autofill_source
-from .summarize.llm import LLMSettings, Mode
+from .summarize.llm import LLMSettings, Mode, canonical_mode
 from .summarize.llm import summarize as llm_summarize
 from .utils.text import stable_hash
 from .utils.time import iso_from_dt, now_utc_iso, parse_datetime_iso
@@ -307,7 +307,10 @@ def digest(
 @app.command()
 def summarize(
     post_id: int = typer.Argument(..., help="Post id"),
-    mode: Annotated[Mode, typer.Option(help="Summary mode: short|bullets|takeaways")] = "takeaways",
+    mode: Annotated[
+        Mode,
+        typer.Option(help="Summary mode: short|bullets|takeaways|comprehensive (aliases: s|b|t|c)"),
+    ] = "takeaways",
 ):
     """Summarize a stored post using the configured LLM. Cached by content hash."""
     settings = load_settings()
@@ -343,6 +346,7 @@ def summarize(
             )
             raise typer.Exit(code=1)
 
+        mode = canonical_mode(mode)
         ch = str(r["content_hash"] or "") or stable_hash(content)
         model = settings.llm_model
         existing = q1(

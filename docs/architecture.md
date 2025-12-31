@@ -178,7 +178,7 @@ techread stores all operational state locally in SQLite.
 
 **summaries**
 - `post_id` (FK)
-- `mode` (`short|bullets|takeaways`)
+- `mode` (`short|bullets|takeaways|comprehensive`)
 - `model` (LM Studio model name)
 - `content_hash` (ties summary to specific content version)
 - `summary_text`
@@ -248,6 +248,9 @@ For each enabled source:
 1. Load post by id.
 2. Check cached summary by `(mode, model, content_hash)`.
 3. If missing, call LM Studio and store summary.
+4. `comprehensive` mode returns a structured report with sections for summary,
+   key points, technical details, risks/limitations, and action items.
+5. Mode aliases: `s=short`, `b=bullets`, `t=takeaways`, `c=comprehensive`.
 
 ### `techread mark`
 Update `posts.read_state`.

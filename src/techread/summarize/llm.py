@@ -7,7 +7,14 @@ from typing import Literal
 
 from langchain_openai import ChatOpenAI
 
-Mode = Literal["short", "bullets", "takeaways"]
+Mode = Literal["short", "bullets", "takeaways", "comprehensive", "s", "b", "t", "c"]
+
+_MODE_ALIASES = {
+    "s": "short",
+    "b": "bullets",
+    "t": "takeaways",
+    "c": "comprehensive",
+}
 
 
 LM_STUDIO_MODELS = {
@@ -35,6 +42,10 @@ class LLMSettings:
     temperature: float
 
 
+def canonical_mode(mode: Mode) -> str:
+    return _MODE_ALIASES.get(mode, mode)
+
+
 def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
     """Generate a prompt for the LLM based on the summary mode.
 
@@ -47,16 +58,26 @@ def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
     Returns:
         A formatted prompt string containing instructions and the article text.
     """
+    mode = canonical_mode(mode)
     if mode == "short":
         instruction = "Write a TL;DR in 2-3 sentences. Be concrete and technical. No fluff."
     elif mode == "bullets":
         instruction = (
             "Summarize into up to 5 bullet points. Each bullet must be one sentence. Be specific."
         )
-    else:
+    elif mode == "takeaways":
         instruction = (
             "Produce: (1) 3 key takeaways (bullets), (2) a 'Why it matters' paragraph (max 3 sentences), "
             "(3) 1 suggested experiment/action to try."
+        )
+    else:
+        instruction = (
+            "Produce a comprehensive technical summary with this structure:\n"
+            "1) Summary: 3-5 sentences.\n"
+            "2) Key Points: 5 bullets, one sentence each.\n"
+            "3) Technical Details: 3-5 bullets focused on methods, data, or systems.\n"
+            "4) Risks/Limitations: 2-4 bullets.\n"
+            "5) Action Items: 2-3 bullets for practical next steps."
         )
 
     clipped = text[:12000]

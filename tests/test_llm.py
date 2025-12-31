@@ -10,6 +10,7 @@ import pytest
 from techread.summarize.llm import (
     LLMSettings,
     _prompt,
+    canonical_mode,
     get_lmstudio_llm,
     summarize,
 )
@@ -56,6 +57,26 @@ class TestPromptGeneration:
         assert "https://example.com/takeaways" in result
         assert "Content for takeaways." in result
         assert "key takeaways" in result
+
+    def test_comprehensive_mode_prompt(self) -> None:
+        """Test prompt generation for comprehensive summary mode."""
+        title = "Comprehensive Article"
+        url = "https://example.com/comprehensive"
+        text = "Content for comprehensive summary."
+
+        result = _prompt("comprehensive", title, url, text)
+
+        assert "Comprehensive Article" in result
+        assert "https://example.com/comprehensive" in result
+        assert "Content for comprehensive summary." in result
+        assert "comprehensive technical summary" in result
+
+    def test_mode_aliases(self) -> None:
+        """Test canonical mode aliases."""
+        assert canonical_mode("s") == "short"
+        assert canonical_mode("b") == "bullets"
+        assert canonical_mode("t") == "takeaways"
+        assert canonical_mode("c") == "comprehensive"
 
     def test_text_clipping(self) -> None:
         """Test that text is clipped to 12000 characters."""
