@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from techread.ingest.rss import FeedEntry, parse_feed
+from techread.ingest.rss import FeedEntry, FeedMeta, parse_feed, parse_feed_full
 
 
 class TestFeedEntry:
@@ -313,3 +313,23 @@ class TestParseFeed:
         # Both should be included as they have non-empty URLs
         assert result[0].url in ["12345", "https://example.com/67890"]
         assert result[1].url in ["12345", "https://example.com/67890"]
+
+    @patch("techread.ingest.rss.feedparser.parse")
+    def test_parse_feed_full_metadata(self, mock_parse) -> None:
+        """Test parsing feed metadata from the feed object."""
+        mock_feed = Mock()
+        mock_feed.feed = Mock(
+            title="Example Feed",
+            subtitle="Tech updates",
+            link="https://example.com",
+        )
+        mock_feed.entries = []
+        mock_parse.return_value = mock_feed
+
+        meta, entries = parse_feed_full("https://example.com/rss.xml")
+
+        assert isinstance(meta, FeedMeta)
+        assert meta.title == "Example Feed"
+        assert meta.subtitle == "Tech updates"
+        assert meta.link == "https://example.com"
+        assert entries == []

@@ -13,8 +13,27 @@ class FeedEntry:
     published: str
 
 
-def parse_feed(url: str) -> list[FeedEntry]:
-    """Parse an RSS/Atom feed from the given URL and return a list of FeedEntry objects.
+@dataclass(frozen=True)
+class FeedMeta:
+    title: str
+    subtitle: str
+    link: str
+
+
+def _extract_feed_meta(feed) -> FeedMeta:
+    feed_meta = getattr(feed, "feed", None)
+    title = getattr(feed_meta, "title", None) or ""
+    subtitle = getattr(feed_meta, "subtitle", None) or getattr(feed_meta, "description", None) or ""
+    link = getattr(feed_meta, "link", None) or ""
+    return FeedMeta(
+        title=str(title).strip(),
+        subtitle=str(subtitle).strip(),
+        link=str(link).strip(),
+    )
+
+
+def parse_feed_full(url: str) -> tuple[FeedMeta, list[FeedEntry]]:
+    """Parse an RSS/Atom feed from the given URL and return metadata + FeedEntry objects.
 
     This function parses a feed using feedparser, extracts relevant fields from each entry,
     and returns them as FeedEntry dataclass instances. The function handles various feed
@@ -24,8 +43,9 @@ def parse_feed(url: str) -> list[FeedEntry]:
         url: The URL of the RSS or Atom feed to parse.
 
     Returns:
-        A list of FeedEntry objects containing parsed feed entries. The list is
-        deduplicated by URL while preserving the original order of entries.
+        A tuple of FeedMeta and a list of FeedEntry objects containing parsed
+        feed entries. The list is deduplicated by URL while preserving the
+        original order of entries.
 
     Raises:
         Exception: If feedparser encounters an error parsing the URL (e.g., network
@@ -44,6 +64,7 @@ def parse_feed(url: str) -> list[FeedEntry]:
         ...     print(f"{entry.title} - {entry.url}")
     """
     feed = feedparser.parse(url)
+    meta = _extract_feed_meta(feed)
     entries: list[FeedEntry] = []
     for e in feed.entries or []:
         link = getattr(e, "link", None) or ""
@@ -66,4 +87,26 @@ def parse_feed(url: str) -> list[FeedEntry]:
         if it.url and it.url not in seen:
             out.append(it)
             seen.add(it.url)
-    return out
+    return meta, out
+
+
+def parse_feed(url: str) -> list[FeedEntry]:
+    """Parse an RSS/Atom feed from the given URL and return a list of FeedEntry objects.
+
+    This function parses a feed using feedparser, extracts relevant fields from each entry,
+    and returns them as FeedEntry dataclass instances. The function handles various feed
+    formats and ensures consistent field extraction with fallback values.
+
+    Args:
+        url: The URL of the RSS or Atom feed to parse.
+
+    Returns:
+        A list of FeedEntry objects containing parsed feed entries. The list is
+        deduplicated by URL while preserving the original order of entries.
+
+    Raises:
+        Exception: If feedparser encounters an error parsing the URL (e.g., network
+                   issues, invalid URL, or unsupported feed format).
+    """
+    _, entries = parse_feed_full(url)
+    return entries

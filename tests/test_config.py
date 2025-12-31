@@ -1,10 +1,11 @@
 """Unit tests for the config module."""
 
+import dataclasses
 import os
 import platform
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -57,7 +58,7 @@ class TestDefaultPaths:
     def test_default_config_path_windows(self):
         """Test default config path on Windows."""
         if platform.system().lower().startswith("win"):
-            home = str(Path.home())
+            str(Path.home())
             result = _default_config_path()
             assert "AppData" in str(result)
             assert "config.toml" in str(result)
@@ -72,7 +73,7 @@ class TestDefaultPaths:
     def test_default_db_path_windows(self):
         """Test default DB path on Windows."""
         if platform.system().lower().startswith("win"):
-            home = str(Path.home())
+            str(Path.home())
             result = _default_db_path()
             assert "AppData" in str(result)
             assert "techread.db" in str(result)
@@ -87,7 +88,7 @@ class TestDefaultPaths:
     def test_default_cache_dir_windows(self):
         """Test default cache dir on Windows."""
         if platform.system().lower().startswith("win"):
-            home = str(Path.home())
+            str(Path.home())
             result = _default_cache_dir()
             assert "AppData" in str(result)
             assert "cache" in str(result)
@@ -120,7 +121,7 @@ class TestSettings:
             default_top_n=5,
             topics=["topic1"],
         )
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             settings.db_path = "/tmp/new.db"
 
 
@@ -248,8 +249,8 @@ topics = ["  python  ", "rust", "   ", "go"]
     def test_load_settings_creates_directories(self, tmp_path):
         """Test that load_settings creates required directories."""
         with TemporaryDirectory() as tmpdir:
-            db_path = os.path.join(tmpdir, "new", "path", "test.db")
-            cache_dir = os.path.join(tmpdir, "cache")
+            os.path.join(tmpdir, "new", "path", "test.db")
+            os.path.join(tmpdir, "cache")
 
             config_content = """
 db_path = "/tmp/nonexistent/test.db"

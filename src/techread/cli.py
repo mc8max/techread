@@ -14,6 +14,7 @@ from .ingest.extract import extract_text
 from .ingest.fetch import fetch_html
 from .ingest.rss import parse_feed
 from .rank.scoring import score_post
+from .sources.auto import autofill_source
 from .summarize.llm import LLMSettings, Mode
 from .summarize.llm import summarize as llm_summarize
 from .utils.text import stable_hash
@@ -404,13 +405,31 @@ def sources_add(
 ):
     """Add an RSS/Atom source."""
     db = _db()
+    settings = load_settings()
     with session(db) as conn:
         nm = name or url
+        tags_out = tags
+        if not name or not tags:
+            res = autofill_source(
+                conn,
+                settings,
+                source_id=None,
+                url=url,
+                name=nm,
+                tags=tags_out,
+                force=False,
+            )
+            if res.name:
+                nm = res.name
+            if res.tags:
+                tags_out = res.tags
+            for warning in res.warnings:
+                console.print(f"[yellow]Warn[/yellow] {warning}")
         try:
             exec_(
                 conn,
                 "INSERT INTO sources(name, url, type, weight, tags, enabled, created_at) VALUES (?, ?, 'rss', ?, ?, 1, ?)",
-                (nm, url, float(weight), tags, now_utc_iso()),
+                (nm, url, float(weight), tags_out, now_utc_iso()),
             )
         except Exception as e:
             console.print(f"[red]Could not add source[/red]: {e}")
@@ -472,6 +491,46 @@ def sources_test(url: str = typer.Argument(..., help="RSS/Atom feed URL")):
         if e.published:
             console.print(f"   published: {e.published}")
         console.print()
+
+
+@sources_app.command("autofill")
+def sources_autofill(
+    source_id: int | None = typer.Option(None, "--id", help="Only update this source id"),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing name/tags."),
+):
+    """Auto-fill missing source names and tags using feed metadata and LLM tags."""
+    settings = load_settings()
+    db = _db()
+    with session(db) as conn:
+        if source_id is None:
+            rows = qall(conn, "SELECT * FROM sources ORDER BY id")
+        else:
+            rows = qall(conn, "SELECT * FROM sources WHERE id=?", (int(source_id),))
+        if not rows:
+            console.print("[yellow]No sources found.[/yellow]")
+            raise typer.Exit(code=0)
+
+        updated = 0
+        for row in rows:
+            res = autofill_source(
+                conn,
+                settings,
+                source_id=int(row["id"]),
+                url=str(row["url"]),
+                name=str(row["name"] or ""),
+                tags=str(row["tags"] or ""),
+                force=force,
+            )
+            for warning in res.warnings:
+                console.print(f"[yellow]Warn[/yellow] {warning}")
+            if res.name is None and res.tags is None:
+                continue
+            conn.execute(
+                "UPDATE sources SET name=COALESCE(?, name), tags=COALESCE(?, tags) WHERE id=?",
+                (res.name, res.tags, int(row["id"])),
+            )
+            updated += 1
+    console.print(f"Updated sources: [bold]{updated}[/bold]")
 
 
 if __name__ == "__main__":

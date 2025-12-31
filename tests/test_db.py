@@ -3,7 +3,6 @@
 import json
 import os
 import sqlite3
-import tempfile
 from datetime import datetime
 
 import pytest
@@ -32,7 +31,7 @@ class TestDBClass:
     def test_db_immutable(self):
         """Test that DB is immutable (frozen)."""
         db = DB(path="/tmp/test.db")
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
             db.path = "/tmp/new.db"
 
 
@@ -209,8 +208,8 @@ class TestSession:
         with session(db) as conn:
             pass
 
-        # Connection should be closed
-        with pytest.raises(Exception):
+        # Connection should be closed - SQLite raises ProgrammingError for closed connections
+        with pytest.raises(sqlite3.ProgrammingError):
             conn.execute("SELECT 1")
 
 

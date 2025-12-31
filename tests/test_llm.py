@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from techread.summarize.llm import (
-    LM_STUDIO_MODELS,
     LLMSettings,
     _prompt,
     get_lmstudio_llm,

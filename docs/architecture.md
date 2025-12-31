@@ -206,6 +206,14 @@ This enables:
 
 ### `techread sources add`
 1. Insert into `sources` with `enabled=1`.
+2. If `name` or `tags` are missing, parse feed metadata and auto-fill.
+3. Tag generation uses LM Studio and normalizes to lowercase, hyphenated tags (max 5).
+
+### `techread sources autofill`
+1. Select sources (all or `--id`).
+2. For each source, fill missing `name`/`tags` (or overwrite with `--force`).
+3. Tag generation uses feed metadata + recent titles/snippets, normalized to lowercase,
+   hyphenated tags (max 5).
 
 ### `techread fetch`
 For each enabled source:
