@@ -136,8 +136,9 @@ def print_digest(posts: list[dict[str, Any]]) -> None:
                 published = published_raw
         else:
             published = "-"
+        wc = int(p.get("word_count") or 0)
         console.print(f"  {p['url']}")
-        console.print(f"  author={author}  published={published}")
+        console.print(f"  author={author}  published={published}  words={wc}")
         console.print(f"  id={p['id']}")
         if p.get("one_liner"):
             console.print("  ---")

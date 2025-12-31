@@ -49,6 +49,7 @@ cache_dir = "~/.local/share/techread/cache"
 llm_model = "mistral-small-3.2"
 default_top_n = 10
 topics = ["distributed systems", "spark", "kafka", "data platform", "reliability", "llm"]
+min_word_count = 500
 ```
 
 ## Commands (high level)
@@ -60,6 +61,9 @@ topics = ["distributed systems", "spark", "kafka", "data platform", "reliability
 - `techread open <id>`
 - `techread mark <id> --read|--saved|--skip|--unread`
 - `techread sources ...`
+
+Source hygiene:
+- `techread sources purge [--dry-run]` removes posts with `word_count < min_word_count`.
 
 ## Notes
 

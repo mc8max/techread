@@ -3,3 +3,4 @@ cache_dir = "~/.local/share/techread/cache"
 llm_model = "nemotron-3-nano"
 default_top_n = 10
 topics = ["python", "cloud", "ai", "systems", "sre"]
+min_word_count = 500

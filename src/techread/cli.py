@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import webbrowser
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -32,6 +33,34 @@ SOURCE_OPTION = typer.Option(None, "-s", "--source", help="Filter by source id (
 TAG_OPTION = typer.Option(
     None, "-t", "--tag", help="Filter by source name/tags containing tag (repeatable)."
 )
+
+
+def _log_invalid_post(
+    settings,
+    *,
+    source_id: int,
+    source_name: str,
+    url: str,
+    title: str,
+    word_count: int,
+    reason: str,
+) -> None:
+    log_path = Path(settings.cache_dir) / "invalid_posts.log"
+    safe_title = title.replace("\n", " ").strip()
+    line = (
+        f"{now_utc_iso()}\t"
+        f"source_id={source_id}\t"
+        f"source={source_name}\t"
+        f"url={url}\t"
+        f"title={safe_title}\t"
+        f"word_count={word_count}\t"
+        f"reason={reason}\n"
+    )
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.open("a", encoding="utf-8").write(line)
+    except Exception:
+        pass
 
 
 def _db() -> DB:
@@ -93,6 +122,7 @@ def fetch(
                 word_count = 0
                 content_hash = ""
 
+                extract_error = None
                 try:
                     html = fetch_html(e.url, settings.cache_dir)
                     ext = extract_text(html)
@@ -100,7 +130,25 @@ def fetch(
                     word_count = ext.word_count
                     content_hash = stable_hash(content_text) if content_text else ""
                 except Exception as ex:
+                    extract_error = ex
                     console.print(f"[yellow]Warn[/yellow] could not fetch/extract: {e.url} ({ex})")
+
+                if int(word_count or 0) < int(settings.min_word_count):
+                    reason = (
+                        f"below_min_word_count({settings.min_word_count})"
+                        if extract_error is None
+                        else f"extract_failed({extract_error})"
+                    )
+                    _log_invalid_post(
+                        settings,
+                        source_id=int(s["id"]),
+                        source_name=name,
+                        url=e.url,
+                        title=e.title or e.url,
+                        word_count=int(word_count or 0),
+                        reason=reason,
+                    )
+                    continue
 
                 exec_(
                     conn,
@@ -530,6 +578,30 @@ def sources_disable(source_id: int = typer.Argument(..., help="Source id")):
             console.print(f"[red]No such source[/red]: {source_id}")
             raise typer.Exit(code=1)
     console.print(f"Disabled source {source_id}.")
+
+
+@sources_app.command("purge")
+def sources_purge(
+    source: list[int] = SOURCE_OPTION,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show count without deleting."),
+):
+    """Remove invalid posts below the minimum word count."""
+    settings = load_settings()
+    db = _db()
+    with session(db) as conn:
+        params: list = [int(settings.min_word_count)]
+        where = "word_count < ?"
+        if source:
+            placeholders = ",".join("?" for _ in source)
+            where += f" AND source_id IN ({placeholders})"
+            params.extend(source)
+        if dry_run:
+            row = q1(conn, f"SELECT COUNT(*) AS cnt FROM posts WHERE {where}", params)
+            count = int(row["cnt"] if row else 0)
+            console.print(f"Invalid posts found: [bold]{count}[/bold]")
+            raise typer.Exit(code=0)
+        cur = conn.execute(f"DELETE FROM posts WHERE {where}", tuple(params))
+        console.print(f"Purged posts: [bold]{cur.rowcount}[/bold]")
 
 
 @sources_app.command("test")

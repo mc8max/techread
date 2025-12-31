@@ -111,6 +111,7 @@ class TestSettings:
         assert settings.llm_model == "test-model"
         assert settings.default_top_n == 5
         assert settings.topics == ["topic1", "topic2"]
+        assert settings.min_word_count == 500
 
     def test_settings_immutable(self):
         """Test that Settings is immutable (frozen)."""
@@ -140,6 +141,7 @@ class TestLoadSettings:
         assert settings.llm_model == "nemotron-3-nano"
         assert settings.default_top_n == 10
         assert settings.topics == []
+        assert settings.min_word_count == 500
 
     def test_load_settings_with_config_file(self, tmp_path):
         """Test loading settings with a config file."""
@@ -149,6 +151,7 @@ cache_dir = "/tmp/cache"
 llm_model = "custom-model"
 default_top_n = 20
 topics = ["python", "rust"]
+min_word_count = 250
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
@@ -162,6 +165,7 @@ topics = ["python", "rust"]
         assert settings.llm_model == "custom-model"
         assert settings.default_top_n == 20
         assert settings.topics == ["python", "rust"]
+        assert settings.min_word_count == 250
 
     def test_load_settings_with_env_overrides(self, tmp_path):
         """Test that environment variables override config file values."""
@@ -171,6 +175,7 @@ cache_dir = "/tmp/cache"
 llm_model = "custom-model"
 default_top_n = 20
 topics = ["python", "rust"]
+min_word_count = 250
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
@@ -180,12 +185,14 @@ topics = ["python", "rust"]
         orig_cache = os.environ.get("TECHREAD_CACHE_DIR")
         orig_llm = os.environ.get("TECHREAD_LLM_MODEL")
         orig_top_n = os.environ.get("TECHREAD_DEFAULT_TOP_N")
+        orig_min_wc = os.environ.get("TECHREAD_MIN_WORD_COUNT")
 
         try:
             os.environ["TECHREAD_DB_PATH"] = "/tmp/env/test.db"
             os.environ["TECHREAD_CACHE_DIR"] = "/tmp/env/cache"
             os.environ["TECHREAD_LLM_MODEL"] = "env-model"
             os.environ["TECHREAD_DEFAULT_TOP_N"] = "30"
+            os.environ["TECHREAD_MIN_WORD_COUNT"] = "750"
 
             with patch("techread.config._default_config_path") as mock_path:
                 mock_path.return_value = config_file
@@ -196,6 +203,7 @@ topics = ["python", "rust"]
             assert settings.llm_model == "env-model"
             assert settings.default_top_n == 30
             assert settings.topics == ["python", "rust"]
+            assert settings.min_word_count == 750
         finally:
             # Restore original env vars
             if orig_db is not None:
@@ -217,6 +225,11 @@ topics = ["python", "rust"]
                 os.environ["TECHREAD_DEFAULT_TOP_N"] = orig_top_n
             elif "TECHREAD_DEFAULT_TOP_N" in os.environ:
                 del os.environ["TECHREAD_DEFAULT_TOP_N"]
+
+            if orig_min_wc is not None:
+                os.environ["TECHREAD_MIN_WORD_COUNT"] = orig_min_wc
+            elif "TECHREAD_MIN_WORD_COUNT" in os.environ:
+                del os.environ["TECHREAD_MIN_WORD_COUNT"]
 
     def test_load_settings_with_empty_topics(self, tmp_path):
         """Test loading settings with empty topics list."""

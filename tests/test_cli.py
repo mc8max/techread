@@ -293,6 +293,7 @@ def test_fetch_inserts_posts(temp_db):
         llm_model="test-model",
         default_top_n=5,
         topics=[],
+        min_word_count=0,
     )
     entry = FeedEntry(
         title="Entry One",

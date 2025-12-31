@@ -85,6 +85,7 @@ class Settings:
         llm_model: LLM model identifier/name to use for summarization
         default_top_n: Default number of items to return in queries
         topics: List of topic keywords/phrases for filtering content
+        min_word_count: Minimum word count for accepting a post
     """
 
     db_path: str
@@ -92,6 +93,7 @@ class Settings:
     llm_model: str
     default_top_n: int
     topics: list[str]
+    min_word_count: int = 500
 
 
 def load_settings() -> Settings:
@@ -107,6 +109,7 @@ def load_settings() -> Settings:
         - TECHREAD_CACHE_DIR: Override cache directory
         - TECHREAD_LLM_MODEL: Override LLM model
         - TECHREAD_DEFAULT_TOP_N: Override default top N value
+        - TECHREAD_MIN_WORD_COUNT: Override minimum word count for posts
 
     Returns:
         Settings object containing all configuration parameters.
@@ -127,11 +130,13 @@ def load_settings() -> Settings:
     default_top_n = int(data.get("default_top_n", 10))
     topics = data.get("topics", []) or []
     topics = [str(t).strip() for t in topics if str(t).strip()]
+    min_word_count = int(data.get("min_word_count", 500))
 
     # Environment overrides (useful for testing); ignore empty values.
     env_db_path = os.environ.get("TECHREAD_DB_PATH")
     env_cache_dir = os.environ.get("TECHREAD_CACHE_DIR")
     env_llm_model = os.environ.get("TECHREAD_LLM_MODEL")
+    env_min_word_count = os.environ.get("TECHREAD_MIN_WORD_COUNT")
 
     if env_db_path:
         db_path = _expand(env_db_path)
@@ -141,6 +146,10 @@ def load_settings() -> Settings:
         llm_model = env_llm_model
     try:
         default_top_n = int(os.environ.get("TECHREAD_DEFAULT_TOP_N", str(default_top_n)))
+    except ValueError:
+        pass
+    try:
+        min_word_count = int(env_min_word_count or str(min_word_count))
     except ValueError:
         pass
 
@@ -153,4 +162,5 @@ def load_settings() -> Settings:
         llm_model=llm_model,
         default_top_n=default_top_n,
         topics=topics,
+        min_word_count=min_word_count,
     )

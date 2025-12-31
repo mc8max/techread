@@ -124,6 +124,7 @@ src/techread/
 - `llm_model`: e.g. `mistral-small-3.2`
 - `default_top_n`: default digest size
 - `topics`: list of keywords used for simple relevance scoring
+- `min_word_count`: minimum word count required to keep a post
 
 ### Environment overrides
 
@@ -131,6 +132,7 @@ src/techread/
 - `TECHREAD_CACHE_DIR`
 - `TECHREAD_LLM_MODEL`
 - `TECHREAD_DEFAULT_TOP_N`
+- `TECHREAD_MIN_WORD_COUNT`
 
 ---
 
@@ -215,6 +217,10 @@ This enables:
 3. Tag generation uses feed metadata + recent titles/snippets, normalized to lowercase,
    hyphenated tags (max 5).
 
+### `techread sources purge`
+1. Remove posts with `word_count < min_word_count`.
+2. Optional `--dry-run` shows counts without deleting.
+
 ### `techread fetch`
 For each enabled source:
 1. Parse RSS/Atom feed entries.
@@ -223,7 +229,8 @@ For each enabled source:
    - Fetch HTML (disk-cached).
    - Extract `content_text` + `word_count`.
    - Compute `content_hash`.
-   - Insert into `posts`.
+   - If `word_count < min_word_count`, skip insert and log to `invalid_posts.log`.
+   - Otherwise insert into `posts`.
 
 **Failure behavior**
 - Feed parse failures are logged and do not stop other sources.
