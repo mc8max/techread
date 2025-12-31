@@ -76,22 +76,31 @@ This document describes the architecture as implemented in the generated reposit
 
 ```
 src/techread/
-  cli.py                 # Typer commands; orchestrates flows
-  config.py              # config discovery + env overrides
-  db.py                  # SQLite schema + helper functions
+  cli/
+    __init__.py           # Typer app wiring
+    common.py             # shared CLI helpers/options
+    filters.py            # shared query filters
+    posts.py              # fetch/rank/digest/summarize/open/mark
+    sources.py            # sources subcommands
+  config.py               # config discovery + env overrides
+  db.py                   # SQLite schema + helper functions
   ingest/
-    rss.py               # feed parsing (feedparser)
-    fetch.py             # http fetch + disk cache (httpx)
-    extract.py           # HTML->text extraction (trafilatura)
+    rss.py                # feed parsing (feedparser)
+    fetch.py              # http fetch + disk cache (httpx)
+    extract.py            # HTML->text extraction (trafilatura)
   rank/
-    scoring.py           # explainable scoring formula
+    scoring.py            # explainable scoring formula
   summarize/
-    llm.py               # local LM Studio client + prompts
+    llm.py                # local LM Studio client + prompts
   digest/
-    render.py            # Rich output renderers
+    render.py             # Rich output renderers
+  tags/
+    llm.py                # tag generation + normalization
+  sources/
+    auto.py               # source name/tag autofill helpers
   utils/
-    text.py              # hashing, normalization, keyword hits
-    time.py              # iso times, date parsing
+    text.py               # hashing, normalization, keyword hits
+    time.py               # iso times, date parsing
 ```
 
 ---

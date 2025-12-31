@@ -84,7 +84,7 @@ def test_parse_or_fallback():
 
 def test_db(temp_db):
     """Test _db() function."""
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value.db_path = temp_db
         db = _db()
         assert isinstance(db, DB)
@@ -97,7 +97,7 @@ def test_fetch_no_sources(temp_db):
     with session(DB(path=temp_db)) as conn:
         conn.execute("UPDATE sources SET enabled=0 WHERE id=1")
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value.db_path = temp_db
         mock_load.return_value.cache_dir = "/tmp/cache"
 
@@ -108,7 +108,7 @@ def test_fetch_no_sources(temp_db):
 
 def test_rank_no_posts(temp_db):
     """Test rank command with no posts."""
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value.db_path = temp_db
         mock_load.return_value.default_top_n = 5
 
@@ -119,7 +119,7 @@ def test_rank_no_posts(temp_db):
 
 def test_sources_remove_invalid(temp_db):
     """Test sources remove with invalid ID."""
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value.db_path = temp_db
 
         result = runner.invoke(app, ["sources", "remove", "999"])
@@ -129,7 +129,7 @@ def test_sources_remove_invalid(temp_db):
 
 def test_sources_enable_invalid(temp_db):
     """Test sources enable with invalid ID."""
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value.db_path = temp_db
 
         result = runner.invoke(app, ["sources", "enable", "999"])
@@ -139,7 +139,7 @@ def test_sources_enable_invalid(temp_db):
 
 def test_sources_disable_invalid(temp_db):
     """Test sources disable with invalid ID."""
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value.db_path = temp_db
 
         result = runner.invoke(app, ["sources", "disable", "999"])
@@ -176,7 +176,7 @@ class TestCLIOptions:
 
     def test_digest_options(self, temp_db):
         """Test digest command with various options."""
-        with patch("techread.cli.load_settings") as mock_load:
+        with patch("techread.cli.common.load_settings") as mock_load:
             mock_load.return_value.db_path = temp_db
             mock_load.return_value.default_top_n = 5
             mock_load.return_value.llm_model = "nemotron-3-nano"
@@ -195,9 +195,9 @@ def test_sources_autofill_updates(temp_db):
         default_top_n=5,
         topics=[],
     )
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.autofill_source") as mock_autofill:
+        with patch("techread.cli.sources.autofill_source") as mock_autofill:
             mock_autofill.return_value = AutofillResult(
                 name="New Source Name", tags="ai,ml", warnings=[]
             )
@@ -220,9 +220,9 @@ def test_sources_add_autofill(temp_db):
         default_top_n=5,
         topics=[],
     )
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.autofill_source") as mock_autofill:
+        with patch("techread.cli.sources.autofill_source") as mock_autofill:
             mock_autofill.return_value = AutofillResult(
                 name="Auto Name", tags="devops,sre", warnings=[]
             )
@@ -274,7 +274,7 @@ def test_summarize_uses_cached_summary_and_prints_metadata(temp_db):
             (1, "takeaways", "test-model", content_hash, "Cached summary.", now_utc_iso()),
         )
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
         result = runner.invoke(app, ["summarize", "1"])
         assert result.exit_code == 0
@@ -306,13 +306,13 @@ def test_fetch_inserts_posts(temp_db):
         text = "hello world"
         word_count = 2
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.parse_feed") as mock_parse:
+        with patch("techread.cli.posts.parse_feed") as mock_parse:
             mock_parse.return_value = [entry]
-            with patch("techread.cli.fetch_html") as mock_fetch:
+            with patch("techread.cli.posts.fetch_html") as mock_fetch:
                 mock_fetch.return_value = "<html></html>"
-                with patch("techread.cli.extract_text") as mock_extract:
+                with patch("techread.cli.posts.extract_text") as mock_extract:
                     mock_extract.return_value = Extracted()
                     result = runner.invoke(app, ["fetch", "--limit-per-source", "1"])
                     assert result.exit_code == 0
@@ -350,9 +350,9 @@ def test_rank_scores_posts(temp_db):
             ),
         )
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.print_ranked") as mock_print:
+        with patch("techread.cli.posts.print_ranked") as mock_print:
             result = runner.invoke(app, ["rank", "--top", "1"])
             assert result.exit_code == 0
             mock_print.assert_called_once()
@@ -398,9 +398,9 @@ def test_digest_prints_metadata_without_summaries(temp_db):
     def _capture(items):
         captured["items"] = items
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.print_digest") as mock_print:
+        with patch("techread.cli.posts.print_digest") as mock_print:
             mock_print.side_effect = _capture
             result = runner.invoke(app, ["digest", "--top", "1", "--no-auto-summarize"])
             assert result.exit_code == 0
@@ -461,9 +461,9 @@ def test_rank_filters_by_source_id(temp_db):
     def _capture(posts, **_kwargs):
         captured["posts"] = posts
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.print_ranked") as mock_print:
+        with patch("techread.cli.posts.print_ranked") as mock_print:
             mock_print.side_effect = _capture
             result = runner.invoke(app, ["rank", "--top", "5", "--source", "2"])
             assert result.exit_code == 0
@@ -523,9 +523,9 @@ def test_rank_filters_by_tag(temp_db):
     def _capture(posts, **_kwargs):
         captured["posts"] = posts
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.print_ranked") as mock_print:
+        with patch("techread.cli.posts.print_ranked") as mock_print:
             mock_print.side_effect = _capture
             result = runner.invoke(app, ["rank", "--top", "5", "--tag", "ML"])
             assert result.exit_code == 0
@@ -593,9 +593,9 @@ def test_digest_filters_by_source_id(temp_db):
     def _capture(items):
         captured["items"] = items
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.print_digest") as mock_print:
+        with patch("techread.cli.posts.print_digest") as mock_print:
             mock_print.side_effect = _capture
             result = runner.invoke(
                 app, ["digest", "--top", "5", "--no-auto-summarize", "--source", "2"]
@@ -632,7 +632,7 @@ def test_mark_updates_state(temp_db):
                 10,
             ),
         )
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
         result = runner.invoke(app, ["mark", "1", "--read"])
         assert result.exit_code == 0
@@ -651,7 +651,7 @@ def test_mark_invalid_flags(temp_db):
         default_top_n=5,
         topics=[],
     )
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
         result = runner.invoke(app, ["mark", "1", "--read", "--saved"])
         assert result.exit_code == 1
@@ -683,9 +683,9 @@ def test_open_uses_browser(temp_db):
                 10,
             ),
         )
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
-        with patch("techread.cli.webbrowser.open") as mock_open:
+        with patch("techread.cli.posts.webbrowser.open") as mock_open:
             result = runner.invoke(app, ["open", "1"])
             assert result.exit_code == 0
             mock_open.assert_called_once()
@@ -699,7 +699,7 @@ def test_sources_test_success():
         author="Entry Author",
         published="2023-01-01T00:00:00+00:00",
     )
-    with patch("techread.cli.parse_feed") as mock_parse:
+    with patch("techread.cli.sources.parse_feed") as mock_parse:
         mock_parse.return_value = [entry]
         result = runner.invoke(app, ["sources", "test", "https://example.com/rss.xml"])
         assert result.exit_code == 0
@@ -733,7 +733,7 @@ def test_summarize_short_content(temp_db):
             ),
         )
 
-    with patch("techread.cli.load_settings") as mock_load:
+    with patch("techread.cli.common.load_settings") as mock_load:
         mock_load.return_value = settings
         result = runner.invoke(app, ["summarize", "1"])
         assert result.exit_code == 1

@@ -1,95 +1,40 @@
 from __future__ import annotations
 
 import webbrowser
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import timedelta
 from typing import Annotated
 
 import typer
-from rich.console import Console
 
-from .config import load_settings
-from .db import DB, exec_, init_db, q1, qall, session, upsert_score, upsert_summary
-from .digest.render import print_digest, print_ranked, print_sources
-from .ingest.extract import extract_text
-from .ingest.fetch import fetch_html
-from .ingest.rss import parse_feed
-from .rank.scoring import score_post
-from .sources.auto import autofill_source
-from .summarize.llm import LLMSettings, Mode, canonical_mode
-from .summarize.llm import summarize as llm_summarize
-from .utils.text import stable_hash
-from .utils.time import iso_from_dt, now_utc_iso, parse_datetime_iso
+from techread.db import exec_, q1, qall, session, upsert_score, upsert_summary
+from techread.digest.render import print_digest, print_ranked
+from techread.ingest.extract import extract_text
+from techread.ingest.fetch import fetch_html
+from techread.ingest.rss import parse_feed
+from techread.rank.scoring import score_post
+from techread.summarize.llm import LLMSettings, Mode, canonical_mode
+from techread.summarize.llm import summarize as llm_summarize
+from techread.utils.text import stable_hash
+from techread.utils.time import iso_from_dt, now_utc_iso, parse_datetime_iso
 
-app = typer.Typer(
-    add_completion=False, help="techread: fetch, rank, and summarize technical blogs locally."
+from . import common
+from .common import (
+    SOURCE_OPTION,
+    TAG_OPTION,
+    _db,
+    _log_invalid_post,
+    _now,
+    _parse_or_fallback,
+    console,
 )
-sources_app = typer.Typer(help="Manage sources (RSS/Atom).")
-app.add_typer(sources_app, name="sources")
-
-console = Console()
-
-SOURCE_OPTION = typer.Option(None, "-s", "--source", help="Filter by source id (repeatable).")
-TAG_OPTION = typer.Option(
-    None, "-t", "--tag", help="Filter by source name/tags containing tag (repeatable)."
-)
+from .filters import _build_source_filters
 
 
-def _log_invalid_post(
-    settings,
-    *,
-    source_id: int,
-    source_name: str,
-    url: str,
-    title: str,
-    word_count: int,
-    reason: str,
-) -> None:
-    log_path = Path(settings.cache_dir) / "invalid_posts.log"
-    safe_title = title.replace("\n", " ").strip()
-    line = (
-        f"{now_utc_iso()}\t"
-        f"source_id={source_id}\t"
-        f"source={source_name}\t"
-        f"url={url}\t"
-        f"title={safe_title}\t"
-        f"word_count={word_count}\t"
-        f"reason={reason}\n"
-    )
-    try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.open("a", encoding="utf-8").write(line)
-    except Exception:
-        pass
-
-
-def _db() -> DB:
-    s = load_settings()
-    db = DB(path=s.db_path)
-    init_db(db)
-    return db
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _parse_or_fallback(published: str) -> str:
-    if not published:
-        return now_utc_iso()
-    try:
-        dt = parse_datetime_iso(published)
-        return iso_from_dt(dt)
-    except Exception:
-        return now_utc_iso()
-
-
-@app.command()
 def fetch(
     limit_per_source: int = typer.Option(50, help="Max entries to consider per source per run.")
 ):
     """Fetch new posts from enabled sources, extract readable text, and store locally."""
-    settings = load_settings()
+    settings = common.load_settings()
     db = _db()
     with session(db) as conn:
         sources = qall(conn, "SELECT * FROM sources WHERE enabled=1 ORDER BY id")
@@ -171,7 +116,6 @@ def fetch(
         console.print(f"Done. New posts added: [bold]{new_posts}[/bold]")
 
 
-@app.command()
 def rank(
     today: bool = typer.Option(True, "--today/--all", help="Rank only recent posts (default)."),
     top: int | None = typer.Option(None, help="Show top N ranked posts."),
@@ -181,35 +125,19 @@ def rank(
     tag: list[str] = TAG_OPTION,
 ):
     """Compute ranking scores for posts and print a ranked list with explanations."""
-    settings = load_settings()
+    settings = common.load_settings()
     db = _db()
     now = _now()
     since = now - timedelta(hours=max(1, int(hours)))
 
     with session(db) as conn:
-        where = []
-        params: list = []
-        if today:
-            where.append("p.published_at >= ?")
-            params.append(iso_from_dt(since))
-        if not include_read:
-            where.append("p.read_state != 'read'")
-        source_ids = [int(s) for s in (source or [])]
-        if source_ids:
-            placeholders = ",".join("?" for _ in source_ids)
-            where.append(f"s.id IN ({placeholders})")
-            params.extend(source_ids)
-        tag_terms = [str(t).strip().lower() for t in (tag or []) if str(t).strip()]
-        if tag_terms:
-            clauses = []
-            for t in tag_terms:
-                clauses.append("(lower(s.name) LIKE ? OR lower(s.tags) LIKE ?)")
-                like = f"%{t}%"
-                params.extend([like, like])
-            where.append("(" + " OR ".join(clauses) + ")")
-        where_sql = " AND ".join(where)
-        if where_sql:
-            where_sql = "WHERE " + where_sql
+        where_sql, params = _build_source_filters(
+            source=source,
+            tag=tag,
+            today=today,
+            include_read=include_read,
+            since_iso=iso_from_dt(since),
+        )
 
         rows = qall(
             conn,
@@ -251,7 +179,6 @@ def rank(
         print_ranked(posts, show_breakdown=True)
 
 
-@app.command()
 def digest(
     today: bool = typer.Option(True, "--today/--all", help="Use recent posts (default)."),
     top: int | None = typer.Option(None, help="Top N items."),
@@ -263,7 +190,7 @@ def digest(
     tag: list[str] = TAG_OPTION,
 ):
     """Print a busy-reader digest: ranked titles + optional 1-line takeaways."""
-    settings = load_settings()
+    settings = common.load_settings()
     db = _db()
 
     now = _now()
@@ -271,28 +198,13 @@ def digest(
 
     with session(db) as conn:
         # Score missing posts in the window
-        where = []
-        params: list = []
-        if today:
-            where.append("p.published_at >= ?")
-            params.append(iso_from_dt(since))
-        where.append("p.read_state != 'read'")
-        source_ids = [int(s) for s in (source or [])]
-        if source_ids:
-            placeholders = ",".join("?" for _ in source_ids)
-            where.append(f"s.id IN ({placeholders})")
-            params.extend(source_ids)
-        tag_terms = [str(t).strip().lower() for t in (tag or []) if str(t).strip()]
-        if tag_terms:
-            clauses = []
-            for t in tag_terms:
-                clauses.append("(lower(s.name) LIKE ? OR lower(s.tags) LIKE ?)")
-                like = f"%{t}%"
-                params.extend([like, like])
-            where.append("(" + " OR ".join(clauses) + ")")
-        where_sql = " AND ".join(where)
-        if where_sql:
-            where_sql = "WHERE " + where_sql
+        where_sql, params = _build_source_filters(
+            source=source,
+            tag=tag,
+            today=today,
+            include_read=False,
+            since_iso=iso_from_dt(since),
+        )
 
         rows = qall(
             conn,
@@ -390,7 +302,6 @@ def digest(
         print_digest(items)
 
 
-@app.command()
 def summarize(
     post_id: int = typer.Argument(..., help="Post id"),
     mode: Annotated[
@@ -399,7 +310,7 @@ def summarize(
     ] = "takeaways",
 ):
     """Summarize a stored post using the configured LLM. Cached by content hash."""
-    settings = load_settings()
+    settings = common.load_settings()
     db = _db()
     with session(db) as conn:
         r = q1(conn, "SELECT * FROM posts WHERE id=?", (int(post_id),))
@@ -457,7 +368,6 @@ def summarize(
         console.print(out)
 
 
-@app.command()
 def open(post_id: int = typer.Argument(..., help="Post id")):
     """Open a post in your default browser."""
     db = _db()
@@ -469,7 +379,6 @@ def open(post_id: int = typer.Argument(..., help="Post id")):
         webbrowser.open(str(r["url"]))
 
 
-@app.command()
 def mark(
     post_id: int = typer.Argument(..., help="Post id"),
     read: bool = typer.Option(False, "--read", help="Mark as read."),
@@ -494,177 +403,3 @@ def mark(
             console.print(f"[red]No such post[/red]: {post_id}")
             raise typer.Exit(code=1)
         console.print(f"Marked {post_id} as [bold]{state}[/bold].")
-
-
-@sources_app.command("list")
-def sources_list():
-    """List sources."""
-    db = _db()
-    with session(db) as conn:
-        rows = [dict(r) for r in qall(conn, "SELECT * FROM sources ORDER BY id")]
-    print_sources(rows)
-
-
-@sources_app.command("add")
-def sources_add(
-    url: str = typer.Argument(..., help="RSS/Atom feed URL"),
-    name: str | None = typer.Option(None, help="Display name"),
-    weight: float = typer.Option(1.0, help="Source weight (ranking prior)"),
-    tags: str = typer.Option("", help="Comma-separated tags"),
-):
-    """Add an RSS/Atom source."""
-    db = _db()
-    settings = load_settings()
-    with session(db) as conn:
-        nm = name or url
-        tags_out = tags
-        if not name or not tags:
-            res = autofill_source(
-                conn,
-                settings,
-                source_id=None,
-                url=url,
-                name=nm,
-                tags=tags_out,
-                force=False,
-            )
-            if res.name:
-                nm = res.name
-            if res.tags:
-                tags_out = res.tags
-            for warning in res.warnings:
-                console.print(f"[yellow]Warn[/yellow] {warning}")
-        try:
-            exec_(
-                conn,
-                "INSERT INTO sources(name, url, type, weight, tags, enabled, created_at) VALUES (?, ?, 'rss', ?, ?, 1, ?)",
-                (nm, url, float(weight), tags_out, now_utc_iso()),
-            )
-        except Exception as e:
-            console.print(f"[red]Could not add source[/red]: {e}")
-            raise typer.Exit(code=1) from e
-    console.print(f"Added source: [bold]{nm}[/bold]")
-
-
-@sources_app.command("remove")
-def sources_remove(source_id: int = typer.Argument(..., help="Source id")):
-    """Remove a source (does not delete already-fetched posts)."""
-    db = _db()
-    with session(db) as conn:
-        cur = conn.execute("DELETE FROM sources WHERE id=?", (int(source_id),))
-        if cur.rowcount == 0:
-            console.print(f"[red]No such source[/red]: {source_id}")
-            raise typer.Exit(code=1)
-    console.print(f"Removed source {source_id}.")
-
-
-@sources_app.command("enable")
-def sources_enable(source_id: int = typer.Argument(..., help="Source id")):
-    db = _db()
-    with session(db) as conn:
-        cur = conn.execute("UPDATE sources SET enabled=1 WHERE id=?", (int(source_id),))
-        if cur.rowcount == 0:
-            console.print(f"[red]No such source[/red]: {source_id}")
-            raise typer.Exit(code=1)
-    console.print(f"Enabled source {source_id}.")
-
-
-@sources_app.command("disable")
-def sources_disable(source_id: int = typer.Argument(..., help="Source id")):
-    db = _db()
-    with session(db) as conn:
-        cur = conn.execute("UPDATE sources SET enabled=0 WHERE id=?", (int(source_id),))
-        if cur.rowcount == 0:
-            console.print(f"[red]No such source[/red]: {source_id}")
-            raise typer.Exit(code=1)
-    console.print(f"Disabled source {source_id}.")
-
-
-@sources_app.command("purge")
-def sources_purge(
-    source: list[int] = SOURCE_OPTION,
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show count without deleting."),
-):
-    """Remove invalid posts below the minimum word count."""
-    settings = load_settings()
-    db = _db()
-    with session(db) as conn:
-        params: list = [int(settings.min_word_count)]
-        where = "word_count < ?"
-        if source:
-            placeholders = ",".join("?" for _ in source)
-            where += f" AND source_id IN ({placeholders})"
-            params.extend(source)
-        if dry_run:
-            row = q1(conn, f"SELECT COUNT(*) AS cnt FROM posts WHERE {where}", params)
-            count = int(row["cnt"] if row else 0)
-            console.print(f"Invalid posts found: [bold]{count}[/bold]")
-            raise typer.Exit(code=0)
-        cur = conn.execute(f"DELETE FROM posts WHERE {where}", tuple(params))
-        console.print(f"Purged posts: [bold]{cur.rowcount}[/bold]")
-
-
-@sources_app.command("test")
-def sources_test(url: str = typer.Argument(..., help="RSS/Atom feed URL")):
-    """Quick validation: parse feed and show the first 5 entries."""
-    try:
-        entries = parse_feed(url)[:5]
-    except Exception as e:
-        console.print(f"[red]Failed[/red]: {e}")
-        raise typer.Exit(code=1) from e
-
-    if not entries:
-        console.print("[yellow]No entries found.[/yellow]")
-        raise typer.Exit(code=0)
-
-    console.print(f"[bold]Top entries for[/bold] {url}")
-    for i, e in enumerate(entries, start=1):
-        console.print(f"{i}. {e.title}")
-        console.print(f"   {e.url}")
-        if e.published:
-            console.print(f"   published: {e.published}")
-        console.print()
-
-
-@sources_app.command("autofill")
-def sources_autofill(
-    source_id: int | None = typer.Option(None, "--id", help="Only update this source id"),
-    force: bool = typer.Option(False, "--force", help="Overwrite existing name/tags."),
-):
-    """Auto-fill missing source names and tags using feed metadata and LLM tags."""
-    settings = load_settings()
-    db = _db()
-    with session(db) as conn:
-        if source_id is None:
-            rows = qall(conn, "SELECT * FROM sources ORDER BY id")
-        else:
-            rows = qall(conn, "SELECT * FROM sources WHERE id=?", (int(source_id),))
-        if not rows:
-            console.print("[yellow]No sources found.[/yellow]")
-            raise typer.Exit(code=0)
-
-        updated = 0
-        for row in rows:
-            res = autofill_source(
-                conn,
-                settings,
-                source_id=int(row["id"]),
-                url=str(row["url"]),
-                name=str(row["name"] or ""),
-                tags=str(row["tags"] or ""),
-                force=force,
-            )
-            for warning in res.warnings:
-                console.print(f"[yellow]Warn[/yellow] {warning}")
-            if res.name is None and res.tags is None:
-                continue
-            conn.execute(
-                "UPDATE sources SET name=COALESCE(?, name), tags=COALESCE(?, tags) WHERE id=?",
-                (res.name, res.tags, int(row["id"])),
-            )
-            updated += 1
-    console.print(f"Updated sources: [bold]{updated}[/bold]")
-
-
-if __name__ == "__main__":
-    app()
