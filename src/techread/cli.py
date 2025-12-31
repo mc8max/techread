@@ -235,7 +235,8 @@ def digest(
 
         ranked = qall(
             conn,
-            "SELECT p.id, p.title, p.url, p.word_count, p.read_state, p.content_text, p.content_hash, sc.score "
+            "SELECT p.id, p.title, p.url, p.author, p.published_at, p.word_count, "
+            "p.read_state, p.content_text, p.content_hash, sc.score "
             "FROM posts p JOIN scores sc ON p.id=sc.post_id "
             "WHERE p.read_state != 'read' "
             "ORDER BY sc.score DESC "
@@ -316,6 +317,24 @@ def summarize(
         if not r:
             console.print(f"[red]No such post[/red]: {post_id}")
             raise typer.Exit(code=1)
+
+        title = str(r["title"])
+        url = str(r["url"])
+        author = str(r["author"] or "").strip() or "-"
+        published_raw = str(r["published_at"] or "").strip()
+        if published_raw:
+            try:
+                published = parse_datetime_iso(published_raw).strftime("%Y-%m-%d")
+            except Exception:
+                published = published_raw
+        else:
+            published = "-"
+
+        console.print(f"[bold]{title}[/bold]")
+        console.print(f"  {url}")
+        console.print(f"  author={author}  published={published}")
+        console.print(f"  id={post_id}")
+        console.print("  ---")
 
         content = str(r["content_text"] or "")
         if len(content) < 200:

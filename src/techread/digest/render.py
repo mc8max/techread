@@ -7,6 +7,8 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from techread.utils.time import parse_datetime_iso
+
 console = Console()
 
 
@@ -104,6 +106,8 @@ def print_digest(posts: list[dict[str, Any]]) -> None:
                - id: Unique identifier for the post
                - title: Title of the post
                - url: URL to the full article
+               - author: Author of the post (may be empty)
+               - published_at: Published timestamp (ISO string)
                - word_count: Word count for reading time calculation
                - one_liner: Optional short summary/description
 
@@ -112,7 +116,7 @@ def print_digest(posts: list[dict[str, Any]]) -> None:
     - Estimated reading time in minutes
     - Post title (bold)
     - Optional one-liner summary
-    - Post id and URL
+    - Post URL, author, and published time
 
     This format is optimized for quick scanning of multiple posts.
     """
@@ -123,7 +127,19 @@ def print_digest(posts: list[dict[str, Any]]) -> None:
         line = Text(f"#{i} [{mins}m] ", style="bold")
         line.append(str(p["title"]))
         console.print(line)
+        author = str(p.get("author") or "").strip() or "-"
+        published_raw = str(p.get("published_at") or "").strip()
+        if published_raw:
+            try:
+                published = parse_datetime_iso(published_raw).strftime("%Y-%m-%d")
+            except Exception:
+                published = published_raw
+        else:
+            published = "-"
+        console.print(f"  {p['url']}")
+        console.print(f"  author={author}  published={published}")
+        console.print(f"  id={p['id']}")
         if p.get("one_liner"):
+            console.print("  ---")
             console.print(f"  • {p['one_liner']}")
-        console.print(f"  id={p['id']}  {p['url']}")
         console.print()
