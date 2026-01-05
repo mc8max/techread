@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from ..utils.text import contains_any
-from ..utils.time import parse_datetime_iso
+from techread.utils.text import contains_any
+from techread.utils.time import parse_datetime_iso
 
 
 @dataclass(frozen=True)

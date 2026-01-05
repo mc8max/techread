@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from ..utils.text import stable_hash
+from techread.utils.text import stable_hash
 
 DEFAULT_TIMEOUT = 20.0
 

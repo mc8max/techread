@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import typer
 
+from techread.cli import common
+from techread.cli.common import SOURCE_OPTION, _db, console
 from techread.db import exec_, q1, qall, session
 from techread.digest.render import print_sources
 from techread.ingest.rss import parse_feed
 from techread.sources.auto import autofill_source
 from techread.utils.time import now_utc_iso
-
-from . import common
-from .common import SOURCE_OPTION, _db, console
 
 
 def sources_list():

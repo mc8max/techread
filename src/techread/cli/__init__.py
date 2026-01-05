@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import typer
 
-from .common import _db, _now, _parse_or_fallback, console, load_settings  # noqa: F401
-from .posts import digest, fetch, mark, open, rank, summarize
-from .sources import (
+from techread.cli.common import _db, _now, _parse_or_fallback, console, load_settings  # noqa: F401
+from techread.cli.posts import digest, fetch, mark, open, rank, summarize
+from techread.cli.sources import (
     sources_add,
     sources_autofill,
     sources_disable,

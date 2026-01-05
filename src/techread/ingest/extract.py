@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import trafilatura
 
-from ..utils.text import normalize_whitespace
+from techread.utils.text import normalize_whitespace
 
 
 @dataclass(frozen=True)
