@@ -12,7 +12,18 @@ from techread.utils.time import now_utc_iso
 
 
 def sources_list():
-    """List sources."""
+    """List all RSS/Atom sources in the database.
+
+    This command displays all configured sources with their details including:
+    - Source ID
+    - Name (or URL if not set)
+    - URL
+    - Type (currently always 'rss')
+    - Weight (ranking priority)
+    - Tags
+    - Enabled status
+    - Creation timestamp
+    """
     db = _db()
     with session(db) as conn:
         rows = [dict(r) for r in qall(conn, "SELECT * FROM sources ORDER BY id")]
@@ -25,7 +36,28 @@ def sources_add(
     weight: float = typer.Option(1.0, help="Source weight (ranking prior)"),
     tags: str = typer.Option("", help="Comma-separated tags"),
 ):
-    """Add an RSS/Atom source."""
+    """Add an RSS/Atom feed source to the database.
+
+    This command adds a new RSS or Atom feed source to the database. It can:
+    - Add a source with a custom name and tags
+    - Automatically fill in missing name/tags using feed metadata and LLM
+    - Set a weight for ranking sources
+    - Enable the source immediately upon creation
+
+    Parameters:
+        url (str): The RSS/Atom feed URL to add
+        name (str, optional): Display name for the source. If not provided,
+                              the URL will be used as the name
+        weight (float): Ranking priority for this source (default: 1.0)
+        tags (str): Comma-separated list of tags for categorization
+
+    Examples:
+        # Add a source with default settings
+        techread sources add https://example.com/rss
+
+        # Add a source with custom name and tags
+        techread sources add https://example.com/rss --name "Example Feed" --tags "tech,blog" --weight 2.0
+    """
     db = _db()
     settings = common.load_settings()
     with session(db) as conn:
@@ -60,7 +92,18 @@ def sources_add(
 
 
 def sources_remove(source_id: int = typer.Argument(..., help="Source id")):
-    """Remove a source (does not delete already-fetched posts)."""
+    """Remove a source from the database.
+
+    This command removes a source from the database. It does not delete
+    already-fetched posts associated with this source.
+
+    Parameters:
+        source_id (int): The ID of the source to remove
+
+    Examples:
+        # Remove a source by ID
+        techread sources remove 123
+    """
     db = _db()
     with session(db) as conn:
         cur = conn.execute("DELETE FROM sources WHERE id=?", (int(source_id),))
@@ -71,6 +114,18 @@ def sources_remove(source_id: int = typer.Argument(..., help="Source id")):
 
 
 def sources_enable(source_id: int = typer.Argument(..., help="Source id")):
+    """Enable a source in the database.
+
+    This command enables a source that was previously disabled. The source
+    will be included in future feed fetching operations.
+
+    Parameters:
+        source_id (int): The ID of the source to enable
+
+    Examples:
+        # Enable a source by ID
+        techread sources enable 123
+    """
     db = _db()
     with session(db) as conn:
         cur = conn.execute("UPDATE sources SET enabled=1 WHERE id=?", (int(source_id),))
@@ -81,6 +136,18 @@ def sources_enable(source_id: int = typer.Argument(..., help="Source id")):
 
 
 def sources_disable(source_id: int = typer.Argument(..., help="Source id")):
+    """Disable a source in the database.
+
+    This command disables a source, preventing it from being included in
+    future feed fetching operations.
+
+    Parameters:
+        source_id (int): The ID of the source to disable
+
+    Examples:
+        # Disable a source by ID
+        techread sources disable 123
+    """
     db = _db()
     with session(db) as conn:
         cur = conn.execute("UPDATE sources SET enabled=0 WHERE id=?", (int(source_id),))
@@ -94,7 +161,26 @@ def sources_purge(
     source: list[int] = SOURCE_OPTION,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show count without deleting."),
 ):
-    """Remove invalid posts below the minimum word count."""
+    """Remove posts that don't meet the minimum word count threshold.
+
+    This command removes posts from the database that have fewer words
+    than the configured minimum word count. It can be run in dry-run mode
+    to first see how many posts would be removed.
+
+    Parameters:
+        source (list[int], optional): Limit purge to specific source IDs
+        dry_run (bool): Show count of posts that would be purged without deleting them
+
+    Examples:
+        # Purge posts from all sources below minimum word count
+        techread sources purge
+
+        # Dry-run to see how many posts would be purged
+        techread sources purge --dry-run
+
+        # Purge posts from specific source(s)
+        techread sources purge --source 123 --source 456
+    """
     settings = common.load_settings()
     db = _db()
     with session(db) as conn:
@@ -114,7 +200,22 @@ def sources_purge(
 
 
 def sources_test(url: str = typer.Argument(..., help="RSS/Atom feed URL")):
-    """Quick validation: parse feed and show the first 5 entries."""
+    """Quick validation: parse feed and show the first 5 entries.
+
+    This command quickly validates an RSS/Atom feed by parsing it and
+    displaying the first 5 entries. It's useful for testing if a feed
+    is accessible and properly formatted.
+
+    Parameters:
+        url (str): The RSS/Atom feed URL to test
+
+    Examples:
+        # Test a feed
+        techread sources test https://example.com/rss
+
+        # Test a feed with invalid URL (will show error)
+        techread sources test https://invalid-feed.com/rss
+    """
     try:
         entries = parse_feed(url)[:5]
     except Exception as e:
@@ -138,7 +239,28 @@ def sources_autofill(
     source_id: int | None = typer.Option(None, "--id", help="Only update this source id"),
     force: bool = typer.Option(False, "--force", help="Overwrite existing name/tags."),
 ):
-    """Auto-fill missing source names and tags using feed metadata and LLM tags."""
+    """Auto-fill missing source names and tags using feed metadata and LLM tags.
+
+    This command automatically fills in missing source names and tags by:
+    - Extracting metadata from the RSS/Atom feed
+    - Using LLM to generate relevant tags (if configured)
+    - Updating sources in the database
+
+    Parameters:
+        source_id (int, optional): Only update this specific source ID.
+                                   If not provided, updates all sources.
+        force (bool): Overwrite existing name/tags with new values
+
+    Examples:
+        # Auto-fill all sources
+        techread sources autofill
+
+        # Auto-fill a specific source
+        techread sources autofill --id 123
+
+        # Force overwrite of existing values
+        techread sources autofill --force
+    """
     settings = common.load_settings()
     db = _db()
     with session(db) as conn:

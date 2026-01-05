@@ -16,12 +16,26 @@ def _prompt(
     entry_titles: list[str],
     entry_snippets: list[str],
 ) -> str:
+    """Generate a prompt for LLM tag generation.
+
+    This function creates a structured prompt that includes feed metadata and recent
+    entry information to guide the LLM in generating relevant tags.
+
+    Args:
+        feed_title: The title of the RSS feed
+        feed_subtitle: The subtitle/description of the RSS feed
+        entry_titles: List of recent entry titles
+        entry_snippets: List of recent entry content snippets
+
+    Returns:
+        A formatted prompt string ready to be sent to the LLM
+    """
     titles = "\n".join(f"- {t}" for t in entry_titles if t) or "- (none)"
     snippets = "\n".join(f"- {s}" for s in entry_snippets if s) or "- (none)"
     return (
         "You generate concise tags for a technical RSS feed.\n"
         "Return 3-5 tags, comma-separated.\n"
-        "Rules: lowercase, use hyphens instead of spaces, no more than 5 tags.\n\n"
+        "Rules: lowercase, use hy-hyphens instead of spaces, no more than 5 tags.\n\n"
         f"Feed title: {feed_title}\n"
         f"Feed subtitle: {feed_subtitle}\n\n"
         "Recent entry titles:\n"
@@ -32,6 +46,23 @@ def _prompt(
 
 
 def normalize_tags(raw: str) -> list[str]:
+    """Normalize raw tag input into clean, standardized tags.
+
+    This function processes comma-separated or newline-separated tag strings,
+    cleaning and standardizing them according to specific rules:
+    - Convert to lowercase
+    - Replace underscores and spaces with hyphens
+    - Remove invalid characters (non-alphanumeric, non-hyphen)
+    - Remove consecutive hyphens
+    - Limit to maximum 5 tags
+
+    Args:
+        raw: Raw tag string potentially containing multiple tags separated by commas,
+             newlines, or semicolons
+
+    Returns:
+        List of normalized tags (at most 5 tags)
+    """
     text = (raw or "").strip().lower()
     if not text:
         return []
@@ -62,6 +93,24 @@ def generate_tags(
     entry_titles: list[str],
     entry_snippets: list[str],
 ) -> str:
+    """Generate tags for an RSS feed using LLM processing.
+
+    This function orchestrates the complete tag generation pipeline:
+    1. Creates a structured prompt from feed and entry information
+    2. Sends the prompt to an LLM for tag generation
+    3. Processes and normalizes the raw LLM response into clean tags
+    4. Returns comma-separated tags
+
+    Args:
+        settings: LLM configuration settings
+        feed_title: The title of the RSS feed
+        feed_subtitle: The subtitle/description of the RSS feed
+        entry_titles: List of recent entry titles
+        entry_snippets: List of recent entry content snippets
+
+    Returns:
+        Comma-separated string of generated tags
+    """
     llm = get_lmstudio_llm(settings)
     response = llm.invoke(
         _prompt(

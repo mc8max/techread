@@ -38,16 +38,47 @@ DEFAULT_LMSTUDIO_BASE_URL = "http://localhost:1234/v1"
 
 @dataclass(frozen=True)
 class LLMSettings:
+    """Configuration settings for Large Language Model (LLM) usage.
+
+    This dataclass holds the essential parameters needed to configure
+    LLM interactions, including model selection and temperature settings.
+
+    Attributes:
+        model (str): The name of the LLM model to use for generation.
+        temperature (float): Controls randomness in generation (0.0 = deterministic, 1.0 = maximum randomness).
+    """
+
     model: str
     temperature: float
 
 
 def canonical_mode(mode: Mode) -> str:
+    """Convert abbreviated mode names to their full forms.
+
+    This function handles alias expansion for summary modes, converting
+    short forms like "s" to their full equivalents like "short".
+
+    Args:
+        mode: The summary mode, either in full form ("short", "bullets", etc.)
+            or abbreviated form ("s", "b", etc.).
+
+    Returns:
+        The canonical (full) form of the mode name.
+
+    Example:
+        >>> canonical_mode("s")
+        'short'
+        >>> canonical_mode("bullets")
+        'bullets'
+    """
     return _MODE_ALIASES.get(mode, mode)
 
 
 def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
     """Generate a prompt for the LLM based on the summary mode.
+
+    This function creates a structured prompt that instructs the LLM on
+    how to format its response based on the desired summary mode.
 
     Args:
         mode: The summary mode ("short", "bullets", or "takeaways").
@@ -57,6 +88,10 @@ def _prompt(mode: Mode, title: str, url: str, text: str) -> str:
 
     Returns:
         A formatted prompt string containing instructions and the article text.
+
+    Example:
+        >>> _prompt("short", "Test Title", "http://example.com", "Test content")
+        'You summarize technical writing for a busy senior engineer. Be precise....'
     """
     mode = canonical_mode(mode)
     if mode == "short":
@@ -95,7 +130,21 @@ _THINKING_TRAILER_RE = re.compile(r".*?</(think|analysis)>\s*", re.DOTALL | re.I
 
 
 def _strip_thinking(text: str) -> str:
-    """Remove model reasoning blocks if present."""
+    """Remove model reasoning blocks if present.
+
+    This utility function removes special XML-style tags that some LLMs
+    may include in their responses to show internal reasoning or thinking.
+
+    Args:
+        text: The raw text output from an LLM that may contain reasoning blocks.
+
+    Returns:
+        The cleaned text with any thinking blocks removed.
+
+    Example:
+        >>> _strip_thinking("Some content <think>internal reasoning</think> more content")
+        'Some content  more content'
+    """
     without_blocks = _THINKING_BLOCK_RE.sub("", text)
     without_trailer = _THINKING_TRAILER_RE.sub("", without_blocks, count=1)
     return without_trailer.strip()
@@ -103,6 +152,9 @@ def _strip_thinking(text: str) -> str:
 
 def get_lmstudio_llm(settings: LLMSettings) -> ChatOpenAI:
     """Return a ChatOpenAI instance for LM Studio models.
+
+    This function creates and configures a ChatOpenAI instance that can
+    communicate with LM Studio models running locally or on a specified API endpoint.
 
     Args:
         settings: LLM Settings to retrieve Large Language Model.
@@ -112,6 +164,10 @@ def get_lmstudio_llm(settings: LLMSettings) -> ChatOpenAI:
 
     Raises:
         ValueError: If the specified model is not found in the LM Studio configuration.
+
+    Example:
+        >>> settings = LLMSettings(model="mistral-small-3.2", temperature=0.7)
+        >>> llm = get_lmstudio_llm(settings)
     """
     actual_model = LM_STUDIO_MODELS.get(settings.model)
     if actual_model is None:
@@ -126,15 +182,26 @@ def get_lmstudio_llm(settings: LLMSettings) -> ChatOpenAI:
 def summarize(settings: LLMSettings, *, mode: Mode, title: str, url: str, text: str) -> str:
     """Generate a summary of the given text using an LLM.
 
+    This function orchestrates the complete process of generating a summary:
+    it prepares the prompt, calls the LLM with appropriate settings, and processes
+    the response to remove any internal reasoning blocks.
+
     Args:
-        settings: The LLM configuration settings.
+        settings: The LLM configuration settings including model and temperature.
         mode: The summary mode ("short", "bullets", or "takeaways").
         title: The title of the article to summarize.
         url: The URL of the article.
         text: The full text content of the article.
 
     Returns:
-        The generated summary as a string.
+        The generated summary as a string, with any internal reasoning blocks removed.
+
+    Example:
+        >>> settings = LLMSettings(model="mistral-small-3.2", temperature=0.7)
+        >>> summary = summarize(settings, mode="short", title="Test", url="http://example.com", text="Test content")
+
+    Note:
+        The function limits input text to 12000 characters for performance reasons.
     """
     llm = get_lmstudio_llm(settings)
     response = llm.invoke(_prompt(mode, title, url, text))

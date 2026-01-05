@@ -32,7 +32,24 @@ from techread.utils.time import iso_from_dt, now_utc_iso, parse_datetime_iso
 def fetch(
     limit_per_source: int = typer.Option(50, help="Max entries to consider per source per run.")
 ):
-    """Fetch new posts from enabled sources, extract readable text, and store locally."""
+    """Fetch new posts from enabled sources, extract readable text, and store locally.
+
+    This command retrieves the latest posts from all enabled RSS sources, extracts
+    the readable text content, and stores them in the local database for further processing.
+
+    Args:
+        limit_per_source: Maximum number of entries to fetch per source (default: 50)
+
+    Returns:
+        None: This function prints status updates but doesn't return a value
+
+    Example:
+        Fetch posts with default limit:
+        $ techread fetch
+
+        Fetch posts with custom limit per source:
+        $ techread fetch --limit-per-source 100
+    """
     settings = common.load_settings()
     db = _db()
     with session(db) as conn:
@@ -123,7 +140,33 @@ def rank(
     source: list[int] = SOURCE_OPTION,
     tag: list[str] = TAG_OPTION,
 ):
-    """Compute ranking scores for posts and print a ranked list with explanations."""
+    """Compute ranking scores for posts and print a ranked list with explanations.
+
+    This command calculates weighted scores for posts based on various factors
+    including source weight, recency, title quality, and content length. It then
+    displays the highest-ranked posts with their score breakdowns.
+
+    Args:
+        today: Whether to rank only recent posts (default: True)
+        top: Number of top posts to display (None uses default from config)
+        include_read: Whether to include already-read posts in ranking
+        hours: Time window in hours for --today mode (default: 48)
+        source: List of source IDs to filter by
+        tag: List of tags to filter by
+
+    Returns:
+        None: This function prints ranked posts but doesn't return a value
+
+    Example:
+        Rank recent posts with default settings:
+        $ techread rank
+
+        Rank all posts with custom top count:
+        $ techread rank --all --top 10
+
+        Rank posts from specific sources:
+        $ techread rank --source 1 --source 3
+    """
     settings = common.load_settings()
     db = _db()
     now = _now()
@@ -188,7 +231,33 @@ def digest(
     source: list[int] = SOURCE_OPTION,
     tag: list[str] = TAG_OPTION,
 ):
-    """Print a busy-reader digest: ranked titles + optional 1-line takeaways."""
+    """Print a busy-reader digest: ranked titles + optional 1-line takeaways.
+
+    This command creates a concise digest of the highest-ranked posts within
+    a specified time window. It can optionally generate one-line summaries
+    using the configured LLM for each post.
+
+    Args:
+        today: Whether to use only recent posts (default: True)
+        top: Number of top posts to include in digest (None uses default from config)
+        minutes: Time budget in minutes for reading (0 = no limit)
+        auto_summarize: Whether to generate summaries using LLM (default: True)
+        source: List of source IDs to filter by
+        tag: List of tags to filter by
+
+    Returns:
+        None: This function prints digest content but doesn't return a value
+
+    Example:
+        Generate digest with default settings:
+        $ techread digest
+
+        Generate digest with time budget:
+        $ techread digest --minutes 30
+
+        Generate digest with custom top count:
+        $ techread digest --top 5
+    """
     settings = common.load_settings()
     db = _db()
 
@@ -308,7 +377,29 @@ def summarize(
         typer.Option(help="Summary mode: short|bullets|takeaways|comprehensive (aliases: s|b|t|c)"),
     ] = "takeaways",
 ):
-    """Summarize a stored post using the configured LLM. Cached by content hash."""
+    """Summarize a stored post using the configured LLM. Cached by content hash.
+
+    This command generates a summary of a stored post using the configured
+    Large Language Model. The summary is cached based on content hash to
+    avoid reprocessing identical content.
+
+    Args:
+        post_id: The ID of the post to summarize
+        mode: Summary generation mode (short, bullets, takeaways, comprehensive)
+
+    Returns:
+        None: This function prints the summary but doesn't return a value
+
+    Example:
+        Generate a takeaways summary for post #123:
+        $ techread summarize 123
+
+        Generate a bullet-point summary:
+        $ techread summarize 123 --mode bullets
+
+        Generate a comprehensive summary:
+        $ techread summarize 123 --mode comprehensive
+    """
     settings = common.load_settings()
     db = _db()
     with session(db) as conn:
@@ -368,7 +459,20 @@ def summarize(
 
 
 def open(post_id: int = typer.Argument(..., help="Post id")):
-    """Open a post in your default browser."""
+    """Open a post in your default browser.
+
+    This command opens the URL of a specific post in your default web browser.
+
+    Args:
+        post_id: The ID of the post to open
+
+    Returns:
+        None: This function opens a browser window but doesn't return a value
+
+    Example:
+        Open post #123 in browser:
+        $ techread open 123
+    """
     db = _db()
     with session(db) as conn:
         r = q1(conn, "SELECT url FROM posts WHERE id=?", (int(post_id),))
@@ -385,7 +489,28 @@ def mark(
     skip: bool = typer.Option(False, "--skip", help="Mark as skipped."),
     unread: bool = typer.Option(False, "--unread", help="Mark as unread."),
 ):
-    """Update read state for a post."""
+    """Update read state for a post.
+
+    This command allows updating the read status of a specific post to one of:
+    read, saved, skipped, or unread.
+
+    Args:
+        post_id: The ID of the post to update
+        read: Mark as read (default: False)
+        saved: Mark as saved (default: False)
+        skip: Mark as skipped (default: False)
+        unread: Mark as unread (default: False)
+
+    Returns:
+        None: This function prints confirmation but doesn't return a value
+
+    Example:
+        Mark post #123 as read:
+        $ techread mark 123 --read
+
+        Mark post #123 as saved:
+        $ techread mark 123 --saved
+    """
     choices = [("read", read), ("saved", saved), ("skip", skip), ("unread", unread)]
     selected = [name for name, enabled in choices if enabled]
     if len(selected) != 1:
