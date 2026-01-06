@@ -5,7 +5,7 @@ description = "Local CLI tool to fetch, rank, and summarize technical blogs."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
-authors = [{name="techread contributors"}]
+authors = [{email="tritam.hoang@gmail.com"}]
 dependencies = [
   "langchain>=1.0.3",
   "langchain-community>=0.4.1",
